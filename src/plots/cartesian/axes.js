@@ -1250,7 +1250,7 @@ function formatDate(ax, out, hover, extraPrecision) {
         else tr = {y: 'm', m: 'd', d: 'M', M: 'S', S: 4}[tr];
     }
 
-    var dateStr = Lib.formatDate(out.x, fmt, tr, ax.calendar),
+    var dateStr = Lib.formatDate(out.x, fmt, tr, ax.calendar, ax.dtick),
         headStr;
 
     var splitIndex = dateStr.indexOf('\n');

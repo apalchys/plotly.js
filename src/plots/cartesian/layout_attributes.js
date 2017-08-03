@@ -434,7 +434,7 @@ module.exports = {
         ].join(' ')
     },
     tickformat: {
-        valType: 'string',
+        valType: 'any',
         dflt: '',
         role: 'style',
         description: [
@@ -445,7 +445,10 @@ module.exports = {
             'https://github.com/d3/d3-time-format/blob/master/README.md#locale_format',
             'We add one item to d3\'s date formatter: *%{n}f* for fractional seconds',
             'with n digits. For example, *2016-10-13 09:15:23.456* with tickformat',
-            '*%H~%M~%S.%2f* would display *09~15~23.46*'
+            '*%H~%M~%S.%2f* would display *09~15~23.46* Also now you can specify date',
+            'format for each zooming level independently using following configuration',
+            'object {hour: *%H:%M*, day: *%e %b*}. Available following zooming levels:',
+            'year, month, week, day, hour, minute, second, millisecond'
         ].join(' ')
     },
     hoverformat: {

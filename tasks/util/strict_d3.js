@@ -6,6 +6,7 @@ var pathToStrictD3Module = path.join(
     constants.pathToImageTest,
     'strict-d3.js'
 );
+var normalizedPathToStrictD3Module = pathToStrictD3Module.replace(/\\/g, '/'); // replacing of "\" for windows users
 
 /**
  * Transform `require('d3')` expressions to `require(/path/to/strict-d3.js)`
@@ -18,7 +19,7 @@ module.exports = transformTools.makeRequireTransform('requireTransform',
         var pathOut;
 
         if(pathIn === 'd3' && opts.file !== pathToStrictD3Module) {
-            pathOut = 'require(\'' + pathToStrictD3Module + '\')';
+            pathOut = 'require(\'' + normalizedPathToStrictD3Module + '\')';
         }
 
         if(pathOut) return cb(null, pathOut);
