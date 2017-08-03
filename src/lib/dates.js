@@ -451,6 +451,7 @@ function yearMonthDayFormatWorld(cDate) { return cDate.formatDate('M d, yyyy'); 
  *   tr: tickround ('y', 'm', 'd', 'M', 'S', or # digits)
  *      used if no explicit fmt is provided
  *   calendar: optional string, the world calendar system to use
+ *   dtick: optional string or number, side of tick for custom formatting
  *
  * returns the date/time as a string, potentially with the leading portion
  * on a separate line (after '\n')
@@ -458,13 +459,40 @@ function yearMonthDayFormatWorld(cDate) { return cDate.formatDate('M d, yyyy'); 
  * the axis may choose to strip things after it when they don't change from
  * one tick to the next (as it does with automatic formatting)
  */
-exports.formatDate = function(x, fmt, tr, calendar) {
+exports.formatDate = function(x, fmt, tr, calendar, dtick) {
     var headStr,
         dateStr;
 
     calendar = isWorldCalendar(calendar) && calendar;
 
-    if(fmt) return modDateFormat(fmt, x, calendar);
+    if(fmt) {
+        if(typeof fmt === 'string') return modDateFormat(fmt, x, calendar);
+        if(typeof fmt === 'object') {
+            var unit = '';
+            if(typeof dtick === 'string') {
+                if(Number(dtick.replace('M', '')) > 6) {
+                    unit = 'year';
+                } else if(Number(dtick.replace('M', '')) >= 1) {
+                    unit = 'month';
+                }
+            } else if(dtick >= ONEDAY * 7) {
+                unit = 'week';
+            } else if(dtick >= ONEDAY) {
+                unit = 'day';
+            } else if(dtick >= ONEHOUR) {
+                unit = 'hour';
+            } else if(dtick >= ONEMIN) {
+                unit = 'minute';
+            } else if(dtick >= ONESEC) {
+                unit = 'second';
+            } else if(dtick >= 0) {
+                unit = 'millisecond';
+            }
+            if(fmt[unit]) {
+                return modDateFormat(fmt[unit], x, calendar);
+            }
+        }
+    }
 
     if(calendar) {
         try {
