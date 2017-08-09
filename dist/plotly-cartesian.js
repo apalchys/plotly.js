@@ -273,7 +273,7 @@ module.exports = require('../src/traces/heatmap');
 
 module.exports = require('../src/traces/histogram');
 
-},{"../src/traces/histogram":304}],9:[function(require,module,exports){
+},{"../src/traces/histogram":312}],9:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -286,7 +286,7 @@ module.exports = require('../src/traces/histogram');
 
 module.exports = require('../src/traces/histogram2d');
 
-},{"../src/traces/histogram2d":309}],10:[function(require,module,exports){
+},{"../src/traces/histogram2d":300}],10:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -299,7 +299,7 @@ module.exports = require('../src/traces/histogram2d');
 
 module.exports = require('../src/traces/histogram2dcontour');
 
-},{"../src/traces/histogram2dcontour":313}],11:[function(require,module,exports){
+},{"../src/traces/histogram2dcontour":304}],11:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -12914,6 +12914,313 @@ else {
 
 'use strict';
 
+var annAtts = require('../annotations/attributes');
+
+module.exports = {
+    _isLinkedToArray: 'annotation',
+
+    visible: annAtts.visible,
+    x: {
+        valType: 'any',
+        
+        
+    },
+    y: {
+        valType: 'any',
+        
+        
+    },
+    z: {
+        valType: 'any',
+        
+        
+    },
+    ax: {
+        valType: 'number',
+        
+        
+    },
+    ay: {
+        valType: 'number',
+        
+        
+    },
+
+    xanchor: annAtts.xanchor,
+    xshift: annAtts.xshift,
+    yanchor: annAtts.yanchor,
+    yshift: annAtts.yshift,
+
+    text: annAtts.text,
+    textangle: annAtts.textangle,
+    font: annAtts.font,
+    width: annAtts.width,
+    height: annAtts.height,
+    opacity: annAtts.opacity,
+    align: annAtts.align,
+    valign: annAtts.valign,
+    bgcolor: annAtts.bgcolor,
+    bordercolor: annAtts.bordercolor,
+    borderpad: annAtts.borderpad,
+    borderwidth: annAtts.borderwidth,
+    showarrow: annAtts.showarrow,
+    arrowcolor: annAtts.arrowcolor,
+    arrowhead: annAtts.arrowhead,
+    arrowsize: annAtts.arrowsize,
+    arrowwidth: annAtts.arrowwidth,
+    standoff: annAtts.standoff,
+    hovertext: annAtts.hovertext,
+    hoverlabel: annAtts.hoverlabel,
+    captureevents: annAtts.captureevents
+
+    // maybes later?
+    // clicktoshow: annAtts.clicktoshow,
+    // xclick: annAtts.xclick,
+    // yclick: annAtts.yclick,
+
+    // not needed!
+    // axref: 'pixel'
+    // ayref: 'pixel'
+    // xref: 'x'
+    // yref: 'y
+    // zref: 'z'
+};
+
+},{"../annotations/attributes":31}],25:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Lib = require('../../lib');
+var Axes = require('../../plots/cartesian/axes');
+
+module.exports = function convert(scene) {
+    var fullSceneLayout = scene.fullSceneLayout;
+    var anns = fullSceneLayout.annotations;
+
+    for(var i = 0; i < anns.length; i++) {
+        mockAnnAxes(anns[i], scene);
+    }
+
+    scene.fullLayout._infolayer
+        .selectAll('.annotation-' + scene.id)
+        .remove();
+};
+
+function mockAnnAxes(ann, scene) {
+    var fullSceneLayout = scene.fullSceneLayout;
+    var domain = fullSceneLayout.domain;
+    var size = scene.fullLayout._size;
+
+    var base = {
+        // this gets fill in on render
+        pdata: null,
+
+        // to get setConvert to not execute cleanly
+        type: 'linear',
+
+        // don't try to update them on `editable: true`
+        autorange: false,
+
+        // set infinite range so that annotation draw routine
+        // does not try to remove 'outside-range' annotations,
+        // this case is handled in the render loop
+        range: [-Infinity, Infinity]
+    };
+
+    ann._xa = {};
+    Lib.extendFlat(ann._xa, base);
+    Axes.setConvert(ann._xa);
+    ann._xa._offset = size.l + domain.x[0] * size.w;
+    ann._xa.l2p = function() {
+        return 0.5 * (1 + ann.pdata[0] / ann.pdata[3]) * size.w * (domain.x[1] - domain.x[0]);
+    };
+
+    ann._ya = {};
+    Lib.extendFlat(ann._ya, base);
+    Axes.setConvert(ann._ya);
+    ann._ya._offset = size.t + (1 - domain.y[1]) * size.h;
+    ann._ya.l2p = function() {
+        return 0.5 * (1 - ann.pdata[1] / ann.pdata[3]) * size.h * (domain.y[1] - domain.y[0]);
+    };
+}
+
+},{"../../lib":154,"../../plots/cartesian/axes":190}],26:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Lib = require('../../lib');
+var Axes = require('../../plots/cartesian/axes');
+var handleArrayContainerDefaults = require('../../plots/array_container_defaults');
+var handleAnnotationCommonDefaults = require('../annotations/common_defaults');
+var attributes = require('./attributes');
+
+module.exports = function handleDefaults(sceneLayoutIn, sceneLayoutOut, opts) {
+    handleArrayContainerDefaults(sceneLayoutIn, sceneLayoutOut, {
+        name: 'annotations',
+        handleItemDefaults: handleAnnotationDefaults,
+        fullLayout: opts.fullLayout
+    });
+};
+
+function handleAnnotationDefaults(annIn, annOut, sceneLayout, opts, itemOpts) {
+    function coerce(attr, dflt) {
+        return Lib.coerce(annIn, annOut, attributes, attr, dflt);
+    }
+
+    function coercePosition(axLetter) {
+        var axName = axLetter + 'axis';
+
+        // mock in such way that getFromId grabs correct 3D axis
+        var gdMock = { _fullLayout: {} };
+        gdMock._fullLayout[axName] = sceneLayout[axName];
+
+        return Axes.coercePosition(annOut, gdMock, coerce, axLetter, axLetter, 0.5);
+    }
+
+
+    var visible = coerce('visible', !itemOpts.itemIsNotPlainObject);
+    if(!visible) return annOut;
+
+    handleAnnotationCommonDefaults(annIn, annOut, opts.fullLayout, coerce);
+
+    coercePosition('x');
+    coercePosition('y');
+    coercePosition('z');
+
+    // if you have one coordinate you should all three
+    Lib.noneOrAll(annIn, annOut, ['x', 'y', 'z']);
+
+    // hard-set here for completeness
+    annOut.xref = 'x';
+    annOut.yref = 'y';
+    annOut.zref = 'z';
+
+    coerce('xanchor');
+    coerce('yanchor');
+    coerce('xshift');
+    coerce('yshift');
+
+    if(annOut.showarrow) {
+        annOut.axref = 'pixel';
+        annOut.ayref = 'pixel';
+
+        // TODO maybe default values should be bigger than the 2D case?
+        coerce('ax', -10);
+        coerce('ay', -30);
+
+        // if you have one part of arrow length you should have both
+        Lib.noneOrAll(annIn, annOut, ['ax', 'ay']);
+    }
+
+    return annOut;
+}
+
+},{"../../lib":154,"../../plots/array_container_defaults":187,"../../plots/cartesian/axes":190,"../annotations/common_defaults":34,"./attributes":24}],27:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var drawRaw = require('../annotations/draw').drawRaw;
+var project = require('../../plots/gl3d/project');
+var axLetters = ['x', 'y', 'z'];
+
+module.exports = function draw(scene) {
+    var fullSceneLayout = scene.fullSceneLayout;
+    var dataScale = scene.dataScale;
+    var anns = fullSceneLayout.annotations;
+
+    for(var i = 0; i < anns.length; i++) {
+        var ann = anns[i];
+        var annotationIsOffscreen = false;
+
+        for(var j = 0; j < 3; j++) {
+            var axLetter = axLetters[j];
+            var pos = ann[axLetter];
+            var ax = fullSceneLayout[axLetter + 'axis'];
+            var posFraction = ax.r2fraction(pos);
+
+            if(posFraction < 0 || posFraction > 1) {
+                annotationIsOffscreen = true;
+                break;
+            }
+        }
+
+        if(annotationIsOffscreen) {
+            scene.fullLayout._infolayer
+                .select('.annotation-' + scene.id + '[data-index="' + i + '"]')
+                .remove();
+        } else {
+            ann.pdata = project(scene.glplot.cameraParams, [
+                fullSceneLayout.xaxis.r2l(ann.x) * dataScale[0],
+                fullSceneLayout.yaxis.r2l(ann.y) * dataScale[1],
+                fullSceneLayout.zaxis.r2l(ann.z) * dataScale[2]
+            ]);
+
+            drawRaw(scene.graphDiv, ann, i, scene.id, ann._xa, ann._ya);
+        }
+    }
+};
+
+},{"../../plots/gl3d/project":216,"../annotations/draw":37}],28:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+module.exports = {
+    moduleType: 'component',
+    name: 'annotations3d',
+
+    schema: {
+        layout: {
+            'scene.annotations': require('./attributes')
+        }
+    },
+
+    layoutAttributes: require('./attributes'),
+    handleDefaults: require('./defaults'),
+
+    convert: require('./convert'),
+    draw: require('./draw')
+};
+
+},{"./attributes":24,"./convert":25,"./defaults":26,"./draw":27}],29:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
 var Lib = require('../../lib');
 var Axes = require('../../plots/cartesian/axes');
 var handleAnnotationCommonDefaults = require('./common_defaults');
@@ -12999,7 +13306,7 @@ module.exports = function handleAnnotationDefaults(annIn, annOut, fullLayout, op
     return annOut;
 };
 
-},{"../../lib":154,"../../plots/cartesian/axes":190,"./attributes":26,"./common_defaults":29}],25:[function(require,module,exports){
+},{"../../lib":154,"../../plots/cartesian/axes":190,"./attributes":31,"./common_defaults":34}],30:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -13064,7 +13371,7 @@ module.exports = [
     }
 ];
 
-},{}],26:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -13344,7 +13651,7 @@ module.exports = {
     }
 };
 
-},{"../../lib/extend":149,"../../plots/cartesian/constants":195,"../../plots/font_attributes":214,"./arrow_paths":25}],27:[function(require,module,exports){
+},{"../../lib/extend":149,"../../plots/cartesian/constants":195,"../../plots/font_attributes":214,"./arrow_paths":30}],32:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -13447,7 +13754,7 @@ function annAutorange(gd) {
     });
 }
 
-},{"../../lib":154,"../../plots/cartesian/axes":190,"./draw":32}],28:[function(require,module,exports){
+},{"../../lib":154,"../../plots/cartesian/axes":190,"./draw":37}],33:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -13581,7 +13888,7 @@ function clickData2r(d, ax) {
     return ax.type === 'log' ? ax.l2r(d) : ax.d2r(d);
 }
 
-},{"../../plotly":185}],29:[function(require,module,exports){
+},{"../../plotly":185}],34:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -13649,7 +13956,7 @@ module.exports = function handleAnnotationCommonDefaults(annIn, annOut, fullLayo
     coerce('captureevents', !!hoverText);
 };
 
-},{"../../lib":154,"../color":41}],30:[function(require,module,exports){
+},{"../../lib":154,"../color":41}],35:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -13712,7 +14019,7 @@ module.exports = function convertCoords(gd, ax, newType, doExtra) {
     }
 };
 
-},{"../../lib/to_log_range":172,"fast-isnumeric":17}],31:[function(require,module,exports){
+},{"../../lib/to_log_range":172,"fast-isnumeric":17}],36:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -13737,7 +14044,7 @@ module.exports = function supplyLayoutDefaults(layoutIn, layoutOut) {
     handleArrayContainerDefaults(layoutIn, layoutOut, opts);
 };
 
-},{"../../plots/array_container_defaults":187,"./annotation_defaults":24}],32:[function(require,module,exports){
+},{"../../plots/array_container_defaults":187,"./annotation_defaults":29}],37:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -14447,7 +14754,7 @@ function drawRaw(gd, options, index, subplotId, xa, ya) {
     else annText.call(textLayout);
 }
 
-},{"../../lib":154,"../../lib/setcursor":169,"../../lib/svg_text_utils":171,"../../plotly":185,"../../plots/cartesian/axes":190,"../../plots/plots":219,"../color":41,"../dragelement":62,"../drawing":65,"../fx":82,"./draw_arrow_head":33,"d3":14}],33:[function(require,module,exports){
+},{"../../lib":154,"../../lib/setcursor":169,"../../lib/svg_text_utils":171,"../../plotly":185,"../../plots/cartesian/axes":190,"../../plots/plots":219,"../color":41,"../dragelement":62,"../drawing":65,"../fx":82,"./draw_arrow_head":38,"d3":14}],38:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -14581,7 +14888,7 @@ module.exports = function drawArrowHead(el3, style, ends, mag, standoff) {
     if(doEnd) drawhead(end, endRot);
 };
 
-},{"../color":41,"../drawing":65,"./arrow_paths":25,"d3":14,"fast-isnumeric":17}],34:[function(require,module,exports){
+},{"../color":41,"../drawing":65,"./arrow_paths":30,"d3":14,"fast-isnumeric":17}],39:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -14614,314 +14921,7 @@ module.exports = {
     convertCoords: require('./convert_coords')
 };
 
-},{"./attributes":26,"./calc_autorange":27,"./click":28,"./convert_coords":30,"./defaults":31,"./draw":32}],35:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var annAtts = require('../annotations/attributes');
-
-module.exports = {
-    _isLinkedToArray: 'annotation',
-
-    visible: annAtts.visible,
-    x: {
-        valType: 'any',
-        
-        
-    },
-    y: {
-        valType: 'any',
-        
-        
-    },
-    z: {
-        valType: 'any',
-        
-        
-    },
-    ax: {
-        valType: 'number',
-        
-        
-    },
-    ay: {
-        valType: 'number',
-        
-        
-    },
-
-    xanchor: annAtts.xanchor,
-    xshift: annAtts.xshift,
-    yanchor: annAtts.yanchor,
-    yshift: annAtts.yshift,
-
-    text: annAtts.text,
-    textangle: annAtts.textangle,
-    font: annAtts.font,
-    width: annAtts.width,
-    height: annAtts.height,
-    opacity: annAtts.opacity,
-    align: annAtts.align,
-    valign: annAtts.valign,
-    bgcolor: annAtts.bgcolor,
-    bordercolor: annAtts.bordercolor,
-    borderpad: annAtts.borderpad,
-    borderwidth: annAtts.borderwidth,
-    showarrow: annAtts.showarrow,
-    arrowcolor: annAtts.arrowcolor,
-    arrowhead: annAtts.arrowhead,
-    arrowsize: annAtts.arrowsize,
-    arrowwidth: annAtts.arrowwidth,
-    standoff: annAtts.standoff,
-    hovertext: annAtts.hovertext,
-    hoverlabel: annAtts.hoverlabel,
-    captureevents: annAtts.captureevents
-
-    // maybes later?
-    // clicktoshow: annAtts.clicktoshow,
-    // xclick: annAtts.xclick,
-    // yclick: annAtts.yclick,
-
-    // not needed!
-    // axref: 'pixel'
-    // ayref: 'pixel'
-    // xref: 'x'
-    // yref: 'y
-    // zref: 'z'
-};
-
-},{"../annotations/attributes":26}],36:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Lib = require('../../lib');
-var Axes = require('../../plots/cartesian/axes');
-
-module.exports = function convert(scene) {
-    var fullSceneLayout = scene.fullSceneLayout;
-    var anns = fullSceneLayout.annotations;
-
-    for(var i = 0; i < anns.length; i++) {
-        mockAnnAxes(anns[i], scene);
-    }
-
-    scene.fullLayout._infolayer
-        .selectAll('.annotation-' + scene.id)
-        .remove();
-};
-
-function mockAnnAxes(ann, scene) {
-    var fullSceneLayout = scene.fullSceneLayout;
-    var domain = fullSceneLayout.domain;
-    var size = scene.fullLayout._size;
-
-    var base = {
-        // this gets fill in on render
-        pdata: null,
-
-        // to get setConvert to not execute cleanly
-        type: 'linear',
-
-        // don't try to update them on `editable: true`
-        autorange: false,
-
-        // set infinite range so that annotation draw routine
-        // does not try to remove 'outside-range' annotations,
-        // this case is handled in the render loop
-        range: [-Infinity, Infinity]
-    };
-
-    ann._xa = {};
-    Lib.extendFlat(ann._xa, base);
-    Axes.setConvert(ann._xa);
-    ann._xa._offset = size.l + domain.x[0] * size.w;
-    ann._xa.l2p = function() {
-        return 0.5 * (1 + ann.pdata[0] / ann.pdata[3]) * size.w * (domain.x[1] - domain.x[0]);
-    };
-
-    ann._ya = {};
-    Lib.extendFlat(ann._ya, base);
-    Axes.setConvert(ann._ya);
-    ann._ya._offset = size.t + (1 - domain.y[1]) * size.h;
-    ann._ya.l2p = function() {
-        return 0.5 * (1 - ann.pdata[1] / ann.pdata[3]) * size.h * (domain.y[1] - domain.y[0]);
-    };
-}
-
-},{"../../lib":154,"../../plots/cartesian/axes":190}],37:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Lib = require('../../lib');
-var Axes = require('../../plots/cartesian/axes');
-var handleArrayContainerDefaults = require('../../plots/array_container_defaults');
-var handleAnnotationCommonDefaults = require('../annotations/common_defaults');
-var attributes = require('./attributes');
-
-module.exports = function handleDefaults(sceneLayoutIn, sceneLayoutOut, opts) {
-    handleArrayContainerDefaults(sceneLayoutIn, sceneLayoutOut, {
-        name: 'annotations',
-        handleItemDefaults: handleAnnotationDefaults,
-        fullLayout: opts.fullLayout
-    });
-};
-
-function handleAnnotationDefaults(annIn, annOut, sceneLayout, opts, itemOpts) {
-    function coerce(attr, dflt) {
-        return Lib.coerce(annIn, annOut, attributes, attr, dflt);
-    }
-
-    function coercePosition(axLetter) {
-        var axName = axLetter + 'axis';
-
-        // mock in such way that getFromId grabs correct 3D axis
-        var gdMock = { _fullLayout: {} };
-        gdMock._fullLayout[axName] = sceneLayout[axName];
-
-        return Axes.coercePosition(annOut, gdMock, coerce, axLetter, axLetter, 0.5);
-    }
-
-
-    var visible = coerce('visible', !itemOpts.itemIsNotPlainObject);
-    if(!visible) return annOut;
-
-    handleAnnotationCommonDefaults(annIn, annOut, opts.fullLayout, coerce);
-
-    coercePosition('x');
-    coercePosition('y');
-    coercePosition('z');
-
-    // if you have one coordinate you should all three
-    Lib.noneOrAll(annIn, annOut, ['x', 'y', 'z']);
-
-    // hard-set here for completeness
-    annOut.xref = 'x';
-    annOut.yref = 'y';
-    annOut.zref = 'z';
-
-    coerce('xanchor');
-    coerce('yanchor');
-    coerce('xshift');
-    coerce('yshift');
-
-    if(annOut.showarrow) {
-        annOut.axref = 'pixel';
-        annOut.ayref = 'pixel';
-
-        // TODO maybe default values should be bigger than the 2D case?
-        coerce('ax', -10);
-        coerce('ay', -30);
-
-        // if you have one part of arrow length you should have both
-        Lib.noneOrAll(annIn, annOut, ['ax', 'ay']);
-    }
-
-    return annOut;
-}
-
-},{"../../lib":154,"../../plots/array_container_defaults":187,"../../plots/cartesian/axes":190,"../annotations/common_defaults":29,"./attributes":35}],38:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var drawRaw = require('../annotations/draw').drawRaw;
-var project = require('../../plots/gl3d/project');
-var axLetters = ['x', 'y', 'z'];
-
-module.exports = function draw(scene) {
-    var fullSceneLayout = scene.fullSceneLayout;
-    var dataScale = scene.dataScale;
-    var anns = fullSceneLayout.annotations;
-
-    for(var i = 0; i < anns.length; i++) {
-        var ann = anns[i];
-        var annotationIsOffscreen = false;
-
-        for(var j = 0; j < 3; j++) {
-            var axLetter = axLetters[j];
-            var pos = ann[axLetter];
-            var ax = fullSceneLayout[axLetter + 'axis'];
-            var posFraction = ax.r2fraction(pos);
-
-            if(posFraction < 0 || posFraction > 1) {
-                annotationIsOffscreen = true;
-                break;
-            }
-        }
-
-        if(annotationIsOffscreen) {
-            scene.fullLayout._infolayer
-                .select('.annotation-' + scene.id + '[data-index="' + i + '"]')
-                .remove();
-        } else {
-            ann.pdata = project(scene.glplot.cameraParams, [
-                fullSceneLayout.xaxis.r2l(ann.x) * dataScale[0],
-                fullSceneLayout.yaxis.r2l(ann.y) * dataScale[1],
-                fullSceneLayout.zaxis.r2l(ann.z) * dataScale[2]
-            ]);
-
-            drawRaw(scene.graphDiv, ann, i, scene.id, ann._xa, ann._ya);
-        }
-    }
-};
-
-},{"../../plots/gl3d/project":216,"../annotations/draw":32}],39:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-module.exports = {
-    moduleType: 'component',
-    name: 'annotations3d',
-
-    schema: {
-        layout: {
-            'scene.annotations': require('./attributes')
-        }
-    },
-
-    layoutAttributes: require('./attributes'),
-    handleDefaults: require('./defaults'),
-
-    convert: require('./convert'),
-    draw: require('./draw')
-};
-
-},{"./attributes":35,"./convert":36,"./defaults":37,"./draw":38}],40:[function(require,module,exports){
+},{"./attributes":31,"./calc_autorange":32,"./click":33,"./convert_coords":35,"./defaults":36,"./draw":37}],40:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -25557,7 +25557,7 @@ module.exports = {
     }
 };
 
-},{"../../lib/extend":149,"../../traces/scatter/attributes":326,"../annotations/attributes":26,"../drawing/attributes":64}],118:[function(require,module,exports){
+},{"../../lib/extend":149,"../../traces/scatter/attributes":326,"../annotations/attributes":31,"../drawing/attributes":64}],118:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -29395,7 +29395,7 @@ exports.Queue = require('./lib/queue');
 // export d3 used in the bundle
 exports.d3 = require('d3');
 
-},{"../build/plotcss":1,"../build/ploticon":2,"./components/annotations":34,"./components/annotations3d":39,"./components/fx":82,"./components/images":90,"./components/legend":98,"./components/rangeselector":110,"./components/rangeslider":116,"./components/shapes":123,"./components/sliders":129,"./components/updatemenus":135,"./fonts/mathjax_config":143,"./lib/queue":166,"./plot_api/plot_schema":179,"./plot_api/register":180,"./plot_api/set_plot_config":181,"./plot_api/to_image":183,"./plot_api/validate":184,"./plotly":185,"./snapshot":239,"./snapshot/download":236,"./traces/scatter":336,"d3":14,"es6-promise":15}],143:[function(require,module,exports){
+},{"../build/plotcss":1,"../build/ploticon":2,"./components/annotations":39,"./components/annotations3d":28,"./components/fx":82,"./components/images":90,"./components/legend":98,"./components/rangeselector":110,"./components/rangeslider":116,"./components/shapes":123,"./components/sliders":129,"./components/updatemenus":135,"./fonts/mathjax_config":143,"./lib/queue":166,"./plot_api/plot_schema":179,"./plot_api/register":180,"./plot_api/set_plot_config":181,"./plot_api/to_image":183,"./plot_api/validate":184,"./plotly":185,"./snapshot":239,"./snapshot/download":236,"./traces/scatter":336,"d3":14,"es6-promise":15}],143:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -30270,6 +30270,7 @@ function yearMonthDayFormatWorld(cDate) { return cDate.formatDate('M d, yyyy'); 
  *   tr: tickround ('y', 'm', 'd', 'M', 'S', or # digits)
  *      used if no explicit fmt is provided
  *   calendar: optional string, the world calendar system to use
+ *   dtick: optional string or number, side of tick for custom formatting
  *
  * returns the date/time as a string, potentially with the leading portion
  * on a separate line (after '\n')
@@ -30277,13 +30278,40 @@ function yearMonthDayFormatWorld(cDate) { return cDate.formatDate('M d, yyyy'); 
  * the axis may choose to strip things after it when they don't change from
  * one tick to the next (as it does with automatic formatting)
  */
-exports.formatDate = function(x, fmt, tr, calendar) {
+exports.formatDate = function(x, fmt, tr, calendar, dtick) {
     var headStr,
         dateStr;
 
     calendar = isWorldCalendar(calendar) && calendar;
 
-    if(fmt) return modDateFormat(fmt, x, calendar);
+    if(fmt) {
+        if(typeof fmt === 'string') return modDateFormat(fmt, x, calendar);
+        if(typeof fmt === 'object') {
+            var unit = '';
+            if(typeof dtick === 'string') {
+                if(Number(dtick.replace('M', '')) > 6) {
+                    unit = 'year';
+                } else if(Number(dtick.replace('M', '')) >= 1) {
+                    unit = 'month';
+                }
+            } else if(dtick >= ONEDAY * 7) {
+                unit = 'week';
+            } else if(dtick >= ONEDAY) {
+                unit = 'day';
+            } else if(dtick >= ONEHOUR) {
+                unit = 'hour';
+            } else if(dtick >= ONEMIN) {
+                unit = 'minute';
+            } else if(dtick >= ONESEC) {
+                unit = 'second';
+            } else if(dtick >= 0) {
+                unit = 'millisecond';
+            }
+            if(fmt[unit]) {
+                return modDateFormat(fmt[unit], x, calendar);
+            }
+        }
+    }
 
     if(calendar) {
         try {
@@ -41225,7 +41253,7 @@ function formatDate(ax, out, hover, extraPrecision) {
         else tr = {y: 'm', m: 'd', d: 'M', M: 'S', S: 4}[tr];
     }
 
-    var dateStr = Lib.formatDate(out.x, fmt, tr, ax.calendar),
+    var dateStr = Lib.formatDate(out.x, fmt, tr, ax.calendar, ax.dtick),
         headStr;
 
     var splitIndex = dateStr.indexOf('\n');
@@ -44964,7 +44992,7 @@ module.exports = {
         
     },
     tickformat: {
-        valType: 'string',
+        valType: 'any',
         dflt: '',
         
         
@@ -58627,7 +58655,7 @@ module.exports = function calc(gd, trace) {
     return [cd0];
 };
 
-},{"../../components/colorscale/calc":47,"../../lib":154,"../../plots/cartesian/axes":190,"../../registry":234,"../histogram2d/calc":307,"./clean_2d_array":283,"./convert_column_xyz":285,"./find_empties":287,"./has_columns":288,"./interp2d":291,"./make_bound_array":292,"./max_row_length":293}],283:[function(require,module,exports){
+},{"../../components/colorscale/calc":47,"../../lib":154,"../../plots/cartesian/axes":190,"../../registry":234,"../histogram2d/calc":298,"./clean_2d_array":283,"./convert_column_xyz":285,"./find_empties":287,"./has_columns":288,"./interp2d":291,"./make_bound_array":292,"./max_row_length":293}],283:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -59952,6 +59980,488 @@ function isValidZ(z) {
 
 'use strict';
 
+var histogramAttrs = require('../histogram/attributes');
+var heatmapAttrs = require('../heatmap/attributes');
+var colorscaleAttrs = require('../../components/colorscale/attributes');
+var colorbarAttrs = require('../../components/colorbar/attributes');
+
+var extendFlat = require('../../lib/extend').extendFlat;
+
+module.exports = extendFlat({},
+    {
+        x: histogramAttrs.x,
+        y: histogramAttrs.y,
+
+        z: {
+            valType: 'data_array',
+            
+        },
+        marker: {
+            color: {
+                valType: 'data_array',
+                
+            }
+        },
+
+        histnorm: histogramAttrs.histnorm,
+        histfunc: histogramAttrs.histfunc,
+        autobinx: histogramAttrs.autobinx,
+        nbinsx: histogramAttrs.nbinsx,
+        xbins: histogramAttrs.xbins,
+        autobiny: histogramAttrs.autobiny,
+        nbinsy: histogramAttrs.nbinsy,
+        ybins: histogramAttrs.ybins,
+
+        xgap: heatmapAttrs.xgap,
+        ygap: heatmapAttrs.ygap,
+        zsmooth: heatmapAttrs.zsmooth
+    },
+    colorscaleAttrs,
+    { autocolorscale: extendFlat({}, colorscaleAttrs.autocolorscale, {dflt: false}) },
+    { colorbar: colorbarAttrs }
+);
+
+},{"../../components/colorbar/attributes":42,"../../components/colorscale/attributes":46,"../../lib/extend":149,"../heatmap/attributes":281,"../histogram/attributes":305}],298:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Lib = require('../../lib');
+var Axes = require('../../plots/cartesian/axes');
+
+var binFunctions = require('../histogram/bin_functions');
+var normFunctions = require('../histogram/norm_functions');
+var doAvg = require('../histogram/average');
+var cleanBins = require('../histogram/clean_bins');
+
+
+module.exports = function calc(gd, trace) {
+    var xa = Axes.getFromId(gd, trace.xaxis || 'x'),
+        x = trace.x ? xa.makeCalcdata(trace, 'x') : [],
+        ya = Axes.getFromId(gd, trace.yaxis || 'y'),
+        y = trace.y ? ya.makeCalcdata(trace, 'y') : [],
+        xcalendar = trace.xcalendar,
+        ycalendar = trace.ycalendar,
+        xr2c = function(v) { return xa.r2c(v, 0, xcalendar); },
+        yr2c = function(v) { return ya.r2c(v, 0, ycalendar); },
+        xc2r = function(v) { return xa.c2r(v, 0, xcalendar); },
+        yc2r = function(v) { return ya.c2r(v, 0, ycalendar); },
+        x0,
+        dx,
+        y0,
+        dy,
+        z,
+        i;
+
+    cleanBins(trace, xa, 'x');
+    cleanBins(trace, ya, 'y');
+
+    var serieslen = Math.min(x.length, y.length);
+    if(x.length > serieslen) x.splice(serieslen, x.length - serieslen);
+    if(y.length > serieslen) y.splice(serieslen, y.length - serieslen);
+
+
+    // calculate the bins
+    if(trace.autobinx || !trace.xbins ||
+            trace.xbins.start === null || trace.xbins.end === null) {
+        trace.xbins = Axes.autoBin(x, xa, trace.nbinsx, '2d', xcalendar);
+        if(trace.type === 'histogram2dcontour') {
+            // the "true" last argument reverses the tick direction (which we can't
+            // just do with a minus sign because of month bins)
+            trace.xbins.start = xc2r(Axes.tickIncrement(
+                xr2c(trace.xbins.start), trace.xbins.size, true, xcalendar));
+            trace.xbins.end = xc2r(Axes.tickIncrement(
+                xr2c(trace.xbins.end), trace.xbins.size, false, xcalendar));
+        }
+
+        // copy bin info back to the source data.
+        trace._input.xbins = trace.xbins;
+        // note that it's possible to get here with an explicit autobin: false
+        // if the bins were not specified.
+        // in that case this will remain in the trace, so that future updates
+        // which would change the autobinning will not do so.
+        trace._input.autobinx = trace.autobinx;
+    }
+    if(trace.autobiny || !trace.ybins ||
+            trace.ybins.start === null || trace.ybins.end === null) {
+        trace.ybins = Axes.autoBin(y, ya, trace.nbinsy, '2d', ycalendar);
+        if(trace.type === 'histogram2dcontour') {
+            trace.ybins.start = yc2r(Axes.tickIncrement(
+                yr2c(trace.ybins.start), trace.ybins.size, true, ycalendar));
+            trace.ybins.end = yc2r(Axes.tickIncrement(
+                yr2c(trace.ybins.end), trace.ybins.size, false, ycalendar));
+        }
+        trace._input.ybins = trace.ybins;
+        trace._input.autobiny = trace.autobiny;
+    }
+
+    // make the empty bin array & scale the map
+    z = [];
+    var onecol = [],
+        zerocol = [],
+        nonuniformBinsX = (typeof(trace.xbins.size) === 'string'),
+        nonuniformBinsY = (typeof(trace.ybins.size) === 'string'),
+        xbins = nonuniformBinsX ? [] : trace.xbins,
+        ybins = nonuniformBinsY ? [] : trace.ybins,
+        total = 0,
+        n,
+        m,
+        counts = [],
+        norm = trace.histnorm,
+        func = trace.histfunc,
+        densitynorm = (norm.indexOf('density') !== -1),
+        extremefunc = (func === 'max' || func === 'min'),
+        sizeinit = (extremefunc ? null : 0),
+        binfunc = binFunctions.count,
+        normfunc = normFunctions[norm],
+        doavg = false,
+        xinc = [],
+        yinc = [];
+
+    // set a binning function other than count?
+    // for binning functions: check first for 'z',
+    // then 'mc' in case we had a colored scatter plot
+    // and want to transfer these colors to the 2D histo
+    // TODO: this is why we need a data picker in the popover...
+    var rawCounterData = ('z' in trace) ?
+        trace.z :
+        (('marker' in trace && Array.isArray(trace.marker.color)) ?
+            trace.marker.color : '');
+    if(rawCounterData && func !== 'count') {
+        doavg = func === 'avg';
+        binfunc = binFunctions[func];
+    }
+
+    // decrease end a little in case of rounding errors
+    var binspec = trace.xbins,
+        binStart = xr2c(binspec.start),
+        binEnd = xr2c(binspec.end) +
+            (binStart - Axes.tickIncrement(binStart, binspec.size, false, xcalendar)) / 1e6;
+
+    for(i = binStart; i < binEnd; i = Axes.tickIncrement(i, binspec.size, false, xcalendar)) {
+        onecol.push(sizeinit);
+        if(nonuniformBinsX) xbins.push(i);
+        if(doavg) zerocol.push(0);
+    }
+    if(nonuniformBinsX) xbins.push(i);
+
+    var nx = onecol.length;
+    x0 = trace.xbins.start;
+    var x0c = xr2c(x0);
+    dx = (i - x0c) / nx;
+    x0 = xc2r(x0c + dx / 2);
+
+    binspec = trace.ybins;
+    binStart = yr2c(binspec.start);
+    binEnd = yr2c(binspec.end) +
+        (binStart - Axes.tickIncrement(binStart, binspec.size, false, ycalendar)) / 1e6;
+
+    for(i = binStart; i < binEnd; i = Axes.tickIncrement(i, binspec.size, false, ycalendar)) {
+        z.push(onecol.concat());
+        if(nonuniformBinsY) ybins.push(i);
+        if(doavg) counts.push(zerocol.concat());
+    }
+    if(nonuniformBinsY) ybins.push(i);
+
+    var ny = z.length;
+    y0 = trace.ybins.start;
+    var y0c = yr2c(y0);
+    dy = (i - y0c) / ny;
+    y0 = yc2r(y0c + dy / 2);
+
+    if(densitynorm) {
+        xinc = onecol.map(function(v, i) {
+            if(nonuniformBinsX) return 1 / (xbins[i + 1] - xbins[i]);
+            return 1 / dx;
+        });
+        yinc = z.map(function(v, i) {
+            if(nonuniformBinsY) return 1 / (ybins[i + 1] - ybins[i]);
+            return 1 / dy;
+        });
+    }
+
+    // for date axes we need bin bounds to be calcdata. For nonuniform bins
+    // we already have this, but uniform with start/end/size they're still strings.
+    if(!nonuniformBinsX && xa.type === 'date') {
+        xbins = {
+            start: xr2c(xbins.start),
+            end: xr2c(xbins.end),
+            size: xbins.size
+        };
+    }
+    if(!nonuniformBinsY && ya.type === 'date') {
+        ybins = {
+            start: yr2c(ybins.start),
+            end: yr2c(ybins.end),
+            size: ybins.size
+        };
+    }
+
+
+    // put data into bins
+    for(i = 0; i < serieslen; i++) {
+        n = Lib.findBin(x[i], xbins);
+        m = Lib.findBin(y[i], ybins);
+        if(n >= 0 && n < nx && m >= 0 && m < ny) {
+            total += binfunc(n, i, z[m], rawCounterData, counts[m]);
+        }
+    }
+    // normalize, if needed
+    if(doavg) {
+        for(m = 0; m < ny; m++) total += doAvg(z[m], counts[m]);
+    }
+    if(normfunc) {
+        for(m = 0; m < ny; m++) normfunc(z[m], total, xinc, yinc[m]);
+    }
+
+    return {
+        x: x,
+        x0: x0,
+        dx: dx,
+        y: y,
+        y0: y0,
+        dy: dy,
+        z: z
+    };
+};
+
+},{"../../lib":154,"../../plots/cartesian/axes":190,"../histogram/average":306,"../histogram/bin_functions":308,"../histogram/clean_bins":310,"../histogram/norm_functions":313}],299:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Lib = require('../../lib');
+
+var handleSampleDefaults = require('./sample_defaults');
+var colorscaleDefaults = require('../../components/colorscale/defaults');
+var attributes = require('./attributes');
+
+
+module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
+    function coerce(attr, dflt) {
+        return Lib.coerce(traceIn, traceOut, attributes, attr, dflt);
+    }
+
+    handleSampleDefaults(traceIn, traceOut, coerce, layout);
+
+    var zsmooth = coerce('zsmooth');
+    if(zsmooth === false) {
+        // ensure that xgap and ygap are coerced only when zsmooth allows them to have an effect.
+        coerce('xgap');
+        coerce('ygap');
+    }
+
+    colorscaleDefaults(
+        traceIn, traceOut, layout, coerce, {prefix: '', cLetter: 'z'}
+    );
+};
+
+},{"../../components/colorscale/defaults":50,"../../lib":154,"./attributes":297,"./sample_defaults":301}],300:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Histogram2D = {};
+
+Histogram2D.attributes = require('./attributes');
+Histogram2D.supplyDefaults = require('./defaults');
+Histogram2D.calc = require('../heatmap/calc');
+Histogram2D.plot = require('../heatmap/plot');
+Histogram2D.colorbar = require('../heatmap/colorbar');
+Histogram2D.style = require('../heatmap/style');
+Histogram2D.hoverPoints = require('../heatmap/hover');
+
+Histogram2D.moduleType = 'trace';
+Histogram2D.name = 'histogram2d';
+Histogram2D.basePlotModule = require('../../plots/cartesian');
+Histogram2D.categories = ['cartesian', '2dMap', 'histogram'];
+Histogram2D.meta = {
+    
+    
+};
+
+module.exports = Histogram2D;
+
+},{"../../plots/cartesian":200,"../heatmap/calc":282,"../heatmap/colorbar":284,"../heatmap/hover":289,"../heatmap/plot":294,"../heatmap/style":295,"./attributes":297,"./defaults":299}],301:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Registry = require('../../registry');
+var handleBinDefaults = require('../histogram/bin_defaults');
+
+
+module.exports = function handleSampleDefaults(traceIn, traceOut, coerce, layout) {
+    var x = coerce('x'),
+        y = coerce('y');
+
+    // we could try to accept x0 and dx, etc...
+    // but that's a pretty weird use case.
+    // for now require both x and y explicitly specified.
+    if(!(x && x.length && y && y.length)) {
+        traceOut.visible = false;
+        return;
+    }
+
+    var handleCalendarDefaults = Registry.getComponentMethod('calendars', 'handleTraceDefaults');
+    handleCalendarDefaults(traceIn, traceOut, ['x', 'y'], layout);
+
+    // if marker.color is an array, we can use it in aggregation instead of z
+    var hasAggregationData = coerce('z') || coerce('marker.color');
+
+    if(hasAggregationData) coerce('histfunc');
+
+    var binDirections = ['x', 'y'];
+    handleBinDefaults(traceIn, traceOut, coerce, binDirections);
+};
+
+},{"../../registry":234,"../histogram/bin_defaults":307}],302:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var histogram2dAttrs = require('../histogram2d/attributes');
+var contourAttrs = require('../contour/attributes');
+var colorscaleAttrs = require('../../components/colorscale/attributes');
+var colorbarAttrs = require('../../components/colorbar/attributes');
+
+var extendFlat = require('../../lib/extend').extendFlat;
+
+module.exports = extendFlat({}, {
+    x: histogram2dAttrs.x,
+    y: histogram2dAttrs.y,
+    z: histogram2dAttrs.z,
+    marker: histogram2dAttrs.marker,
+
+    histnorm: histogram2dAttrs.histnorm,
+    histfunc: histogram2dAttrs.histfunc,
+    autobinx: histogram2dAttrs.autobinx,
+    nbinsx: histogram2dAttrs.nbinsx,
+    xbins: histogram2dAttrs.xbins,
+    autobiny: histogram2dAttrs.autobiny,
+    nbinsy: histogram2dAttrs.nbinsy,
+    ybins: histogram2dAttrs.ybins,
+
+    autocontour: contourAttrs.autocontour,
+    ncontours: contourAttrs.ncontours,
+    contours: contourAttrs.contours,
+    line: contourAttrs.line
+},
+    colorscaleAttrs, {
+        zmin: extendFlat({}, colorscaleAttrs.zmin, {editType: 'docalc'}),
+        zmax: extendFlat({}, colorscaleAttrs.zmax, {editType: 'docalc'})
+    },
+    { colorbar: colorbarAttrs }
+);
+
+},{"../../components/colorbar/attributes":42,"../../components/colorscale/attributes":46,"../../lib/extend":149,"../contour/attributes":266,"../histogram2d/attributes":297}],303:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Lib = require('../../lib');
+
+var handleSampleDefaults = require('../histogram2d/sample_defaults');
+var handleContoursDefaults = require('../contour/contours_defaults');
+var handleStyleDefaults = require('../contour/style_defaults');
+var attributes = require('./attributes');
+
+
+module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
+    function coerce(attr, dflt) {
+        return Lib.coerce(traceIn, traceOut, attributes, attr, dflt);
+    }
+
+    handleSampleDefaults(traceIn, traceOut, coerce, layout);
+    handleContoursDefaults(traceIn, traceOut, coerce);
+    handleStyleDefaults(traceIn, traceOut, coerce, layout);
+};
+
+},{"../../lib":154,"../contour/contours_defaults":270,"../contour/style_defaults":280,"../histogram2d/sample_defaults":301,"./attributes":302}],304:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Histogram2dContour = {};
+
+Histogram2dContour.attributes = require('./attributes');
+Histogram2dContour.supplyDefaults = require('./defaults');
+Histogram2dContour.calc = require('../contour/calc');
+Histogram2dContour.plot = require('../contour/plot').plot;
+Histogram2dContour.style = require('../contour/style');
+Histogram2dContour.colorbar = require('../contour/colorbar');
+Histogram2dContour.hoverPoints = require('../contour/hover');
+
+Histogram2dContour.moduleType = 'trace';
+Histogram2dContour.name = 'histogram2dcontour';
+Histogram2dContour.basePlotModule = require('../../plots/cartesian');
+Histogram2dContour.categories = ['cartesian', '2dMap', 'contour', 'histogram'];
+Histogram2dContour.meta = {
+    
+    
+};
+
+module.exports = Histogram2dContour;
+
+},{"../../plots/cartesian":200,"../contour/calc":267,"../contour/colorbar":268,"../contour/hover":274,"../contour/plot":278,"../contour/style":279,"./attributes":302,"./defaults":303}],305:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
 var barAttrs = require('../bar/attributes');
 
 
@@ -60071,7 +60581,7 @@ function makeBinsAttr(axLetter) {
     };
 }
 
-},{"../bar/attributes":244}],298:[function(require,module,exports){
+},{"../bar/attributes":244}],306:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -60097,7 +60607,7 @@ module.exports = function doAvg(size, counts) {
     return total;
 };
 
-},{}],299:[function(require,module,exports){
+},{}],307:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -60130,7 +60640,7 @@ module.exports = function handleBinDefaults(traceIn, traceOut, coerce, binDirect
     return traceOut;
 };
 
-},{}],300:[function(require,module,exports){
+},{}],308:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -60206,7 +60716,7 @@ module.exports = {
     }
 };
 
-},{"fast-isnumeric":17}],301:[function(require,module,exports){
+},{"fast-isnumeric":17}],309:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -60443,7 +60953,7 @@ function cdf(size, direction, currentbin) {
     }
 }
 
-},{"../../lib":154,"../../plots/cartesian/axes":190,"../bar/arrays_to_calcdata":243,"./average":298,"./bin_functions":300,"./clean_bins":302,"./norm_functions":305,"fast-isnumeric":17}],302:[function(require,module,exports){
+},{"../../lib":154,"../../plots/cartesian/axes":190,"../bar/arrays_to_calcdata":243,"./average":306,"./bin_functions":308,"./clean_bins":310,"./norm_functions":313,"fast-isnumeric":17}],310:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -60520,7 +61030,7 @@ module.exports = function cleanBins(trace, ax, binDirection) {
     if(!trace[autoBinAttr]) delete trace['nbins' + binDirection];
 };
 
-},{"../../constants/numerical":139,"../../lib":154,"fast-isnumeric":17}],303:[function(require,module,exports){
+},{"../../constants/numerical":139,"../../lib":154,"fast-isnumeric":17}],311:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -60582,7 +61092,7 @@ module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout
     errorBarsSupplyDefaults(traceIn, traceOut, Color.defaultLine, {axis: 'x', inherit: 'y'});
 };
 
-},{"../../components/color":41,"../../components/errorbars/defaults":70,"../../lib":154,"../../registry":234,"../bar/style_defaults":255,"./attributes":297,"./bin_defaults":299}],304:[function(require,module,exports){
+},{"../../components/color":41,"../../components/errorbars/defaults":70,"../../lib":154,"../../registry":234,"../bar/style_defaults":255,"./attributes":305,"./bin_defaults":307}],312:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -60631,7 +61141,7 @@ Histogram.meta = {
 
 module.exports = Histogram;
 
-},{"../../plots/cartesian":200,"../bar/hover":247,"../bar/layout_attributes":249,"../bar/layout_defaults":250,"../bar/plot":251,"../bar/set_positions":252,"../bar/style":254,"../scatter/colorbar":329,"./attributes":297,"./calc":301,"./defaults":303}],305:[function(require,module,exports){
+},{"../../plots/cartesian":200,"../bar/hover":247,"../bar/layout_attributes":249,"../bar/layout_defaults":250,"../bar/plot":251,"../bar/set_positions":252,"../bar/style":254,"../scatter/colorbar":329,"./attributes":305,"./calc":309,"./defaults":311}],313:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -60666,489 +61176,7 @@ module.exports = {
     }
 };
 
-},{}],306:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var histogramAttrs = require('../histogram/attributes');
-var heatmapAttrs = require('../heatmap/attributes');
-var colorscaleAttrs = require('../../components/colorscale/attributes');
-var colorbarAttrs = require('../../components/colorbar/attributes');
-
-var extendFlat = require('../../lib/extend').extendFlat;
-
-module.exports = extendFlat({},
-    {
-        x: histogramAttrs.x,
-        y: histogramAttrs.y,
-
-        z: {
-            valType: 'data_array',
-            
-        },
-        marker: {
-            color: {
-                valType: 'data_array',
-                
-            }
-        },
-
-        histnorm: histogramAttrs.histnorm,
-        histfunc: histogramAttrs.histfunc,
-        autobinx: histogramAttrs.autobinx,
-        nbinsx: histogramAttrs.nbinsx,
-        xbins: histogramAttrs.xbins,
-        autobiny: histogramAttrs.autobiny,
-        nbinsy: histogramAttrs.nbinsy,
-        ybins: histogramAttrs.ybins,
-
-        xgap: heatmapAttrs.xgap,
-        ygap: heatmapAttrs.ygap,
-        zsmooth: heatmapAttrs.zsmooth
-    },
-    colorscaleAttrs,
-    { autocolorscale: extendFlat({}, colorscaleAttrs.autocolorscale, {dflt: false}) },
-    { colorbar: colorbarAttrs }
-);
-
-},{"../../components/colorbar/attributes":42,"../../components/colorscale/attributes":46,"../../lib/extend":149,"../heatmap/attributes":281,"../histogram/attributes":297}],307:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var Lib = require('../../lib');
-var Axes = require('../../plots/cartesian/axes');
-
-var binFunctions = require('../histogram/bin_functions');
-var normFunctions = require('../histogram/norm_functions');
-var doAvg = require('../histogram/average');
-var cleanBins = require('../histogram/clean_bins');
-
-
-module.exports = function calc(gd, trace) {
-    var xa = Axes.getFromId(gd, trace.xaxis || 'x'),
-        x = trace.x ? xa.makeCalcdata(trace, 'x') : [],
-        ya = Axes.getFromId(gd, trace.yaxis || 'y'),
-        y = trace.y ? ya.makeCalcdata(trace, 'y') : [],
-        xcalendar = trace.xcalendar,
-        ycalendar = trace.ycalendar,
-        xr2c = function(v) { return xa.r2c(v, 0, xcalendar); },
-        yr2c = function(v) { return ya.r2c(v, 0, ycalendar); },
-        xc2r = function(v) { return xa.c2r(v, 0, xcalendar); },
-        yc2r = function(v) { return ya.c2r(v, 0, ycalendar); },
-        x0,
-        dx,
-        y0,
-        dy,
-        z,
-        i;
-
-    cleanBins(trace, xa, 'x');
-    cleanBins(trace, ya, 'y');
-
-    var serieslen = Math.min(x.length, y.length);
-    if(x.length > serieslen) x.splice(serieslen, x.length - serieslen);
-    if(y.length > serieslen) y.splice(serieslen, y.length - serieslen);
-
-
-    // calculate the bins
-    if(trace.autobinx || !trace.xbins ||
-            trace.xbins.start === null || trace.xbins.end === null) {
-        trace.xbins = Axes.autoBin(x, xa, trace.nbinsx, '2d', xcalendar);
-        if(trace.type === 'histogram2dcontour') {
-            // the "true" last argument reverses the tick direction (which we can't
-            // just do with a minus sign because of month bins)
-            trace.xbins.start = xc2r(Axes.tickIncrement(
-                xr2c(trace.xbins.start), trace.xbins.size, true, xcalendar));
-            trace.xbins.end = xc2r(Axes.tickIncrement(
-                xr2c(trace.xbins.end), trace.xbins.size, false, xcalendar));
-        }
-
-        // copy bin info back to the source data.
-        trace._input.xbins = trace.xbins;
-        // note that it's possible to get here with an explicit autobin: false
-        // if the bins were not specified.
-        // in that case this will remain in the trace, so that future updates
-        // which would change the autobinning will not do so.
-        trace._input.autobinx = trace.autobinx;
-    }
-    if(trace.autobiny || !trace.ybins ||
-            trace.ybins.start === null || trace.ybins.end === null) {
-        trace.ybins = Axes.autoBin(y, ya, trace.nbinsy, '2d', ycalendar);
-        if(trace.type === 'histogram2dcontour') {
-            trace.ybins.start = yc2r(Axes.tickIncrement(
-                yr2c(trace.ybins.start), trace.ybins.size, true, ycalendar));
-            trace.ybins.end = yc2r(Axes.tickIncrement(
-                yr2c(trace.ybins.end), trace.ybins.size, false, ycalendar));
-        }
-        trace._input.ybins = trace.ybins;
-        trace._input.autobiny = trace.autobiny;
-    }
-
-    // make the empty bin array & scale the map
-    z = [];
-    var onecol = [],
-        zerocol = [],
-        nonuniformBinsX = (typeof(trace.xbins.size) === 'string'),
-        nonuniformBinsY = (typeof(trace.ybins.size) === 'string'),
-        xbins = nonuniformBinsX ? [] : trace.xbins,
-        ybins = nonuniformBinsY ? [] : trace.ybins,
-        total = 0,
-        n,
-        m,
-        counts = [],
-        norm = trace.histnorm,
-        func = trace.histfunc,
-        densitynorm = (norm.indexOf('density') !== -1),
-        extremefunc = (func === 'max' || func === 'min'),
-        sizeinit = (extremefunc ? null : 0),
-        binfunc = binFunctions.count,
-        normfunc = normFunctions[norm],
-        doavg = false,
-        xinc = [],
-        yinc = [];
-
-    // set a binning function other than count?
-    // for binning functions: check first for 'z',
-    // then 'mc' in case we had a colored scatter plot
-    // and want to transfer these colors to the 2D histo
-    // TODO: this is why we need a data picker in the popover...
-    var rawCounterData = ('z' in trace) ?
-        trace.z :
-        (('marker' in trace && Array.isArray(trace.marker.color)) ?
-            trace.marker.color : '');
-    if(rawCounterData && func !== 'count') {
-        doavg = func === 'avg';
-        binfunc = binFunctions[func];
-    }
-
-    // decrease end a little in case of rounding errors
-    var binspec = trace.xbins,
-        binStart = xr2c(binspec.start),
-        binEnd = xr2c(binspec.end) +
-            (binStart - Axes.tickIncrement(binStart, binspec.size, false, xcalendar)) / 1e6;
-
-    for(i = binStart; i < binEnd; i = Axes.tickIncrement(i, binspec.size, false, xcalendar)) {
-        onecol.push(sizeinit);
-        if(nonuniformBinsX) xbins.push(i);
-        if(doavg) zerocol.push(0);
-    }
-    if(nonuniformBinsX) xbins.push(i);
-
-    var nx = onecol.length;
-    x0 = trace.xbins.start;
-    var x0c = xr2c(x0);
-    dx = (i - x0c) / nx;
-    x0 = xc2r(x0c + dx / 2);
-
-    binspec = trace.ybins;
-    binStart = yr2c(binspec.start);
-    binEnd = yr2c(binspec.end) +
-        (binStart - Axes.tickIncrement(binStart, binspec.size, false, ycalendar)) / 1e6;
-
-    for(i = binStart; i < binEnd; i = Axes.tickIncrement(i, binspec.size, false, ycalendar)) {
-        z.push(onecol.concat());
-        if(nonuniformBinsY) ybins.push(i);
-        if(doavg) counts.push(zerocol.concat());
-    }
-    if(nonuniformBinsY) ybins.push(i);
-
-    var ny = z.length;
-    y0 = trace.ybins.start;
-    var y0c = yr2c(y0);
-    dy = (i - y0c) / ny;
-    y0 = yc2r(y0c + dy / 2);
-
-    if(densitynorm) {
-        xinc = onecol.map(function(v, i) {
-            if(nonuniformBinsX) return 1 / (xbins[i + 1] - xbins[i]);
-            return 1 / dx;
-        });
-        yinc = z.map(function(v, i) {
-            if(nonuniformBinsY) return 1 / (ybins[i + 1] - ybins[i]);
-            return 1 / dy;
-        });
-    }
-
-    // for date axes we need bin bounds to be calcdata. For nonuniform bins
-    // we already have this, but uniform with start/end/size they're still strings.
-    if(!nonuniformBinsX && xa.type === 'date') {
-        xbins = {
-            start: xr2c(xbins.start),
-            end: xr2c(xbins.end),
-            size: xbins.size
-        };
-    }
-    if(!nonuniformBinsY && ya.type === 'date') {
-        ybins = {
-            start: yr2c(ybins.start),
-            end: yr2c(ybins.end),
-            size: ybins.size
-        };
-    }
-
-
-    // put data into bins
-    for(i = 0; i < serieslen; i++) {
-        n = Lib.findBin(x[i], xbins);
-        m = Lib.findBin(y[i], ybins);
-        if(n >= 0 && n < nx && m >= 0 && m < ny) {
-            total += binfunc(n, i, z[m], rawCounterData, counts[m]);
-        }
-    }
-    // normalize, if needed
-    if(doavg) {
-        for(m = 0; m < ny; m++) total += doAvg(z[m], counts[m]);
-    }
-    if(normfunc) {
-        for(m = 0; m < ny; m++) normfunc(z[m], total, xinc, yinc[m]);
-    }
-
-    return {
-        x: x,
-        x0: x0,
-        dx: dx,
-        y: y,
-        y0: y0,
-        dy: dy,
-        z: z
-    };
-};
-
-},{"../../lib":154,"../../plots/cartesian/axes":190,"../histogram/average":298,"../histogram/bin_functions":300,"../histogram/clean_bins":302,"../histogram/norm_functions":305}],308:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var Lib = require('../../lib');
-
-var handleSampleDefaults = require('./sample_defaults');
-var colorscaleDefaults = require('../../components/colorscale/defaults');
-var attributes = require('./attributes');
-
-
-module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
-    function coerce(attr, dflt) {
-        return Lib.coerce(traceIn, traceOut, attributes, attr, dflt);
-    }
-
-    handleSampleDefaults(traceIn, traceOut, coerce, layout);
-
-    var zsmooth = coerce('zsmooth');
-    if(zsmooth === false) {
-        // ensure that xgap and ygap are coerced only when zsmooth allows them to have an effect.
-        coerce('xgap');
-        coerce('ygap');
-    }
-
-    colorscaleDefaults(
-        traceIn, traceOut, layout, coerce, {prefix: '', cLetter: 'z'}
-    );
-};
-
-},{"../../components/colorscale/defaults":50,"../../lib":154,"./attributes":306,"./sample_defaults":310}],309:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var Histogram2D = {};
-
-Histogram2D.attributes = require('./attributes');
-Histogram2D.supplyDefaults = require('./defaults');
-Histogram2D.calc = require('../heatmap/calc');
-Histogram2D.plot = require('../heatmap/plot');
-Histogram2D.colorbar = require('../heatmap/colorbar');
-Histogram2D.style = require('../heatmap/style');
-Histogram2D.hoverPoints = require('../heatmap/hover');
-
-Histogram2D.moduleType = 'trace';
-Histogram2D.name = 'histogram2d';
-Histogram2D.basePlotModule = require('../../plots/cartesian');
-Histogram2D.categories = ['cartesian', '2dMap', 'histogram'];
-Histogram2D.meta = {
-    
-    
-};
-
-module.exports = Histogram2D;
-
-},{"../../plots/cartesian":200,"../heatmap/calc":282,"../heatmap/colorbar":284,"../heatmap/hover":289,"../heatmap/plot":294,"../heatmap/style":295,"./attributes":306,"./defaults":308}],310:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var Registry = require('../../registry');
-var handleBinDefaults = require('../histogram/bin_defaults');
-
-
-module.exports = function handleSampleDefaults(traceIn, traceOut, coerce, layout) {
-    var x = coerce('x'),
-        y = coerce('y');
-
-    // we could try to accept x0 and dx, etc...
-    // but that's a pretty weird use case.
-    // for now require both x and y explicitly specified.
-    if(!(x && x.length && y && y.length)) {
-        traceOut.visible = false;
-        return;
-    }
-
-    var handleCalendarDefaults = Registry.getComponentMethod('calendars', 'handleTraceDefaults');
-    handleCalendarDefaults(traceIn, traceOut, ['x', 'y'], layout);
-
-    // if marker.color is an array, we can use it in aggregation instead of z
-    var hasAggregationData = coerce('z') || coerce('marker.color');
-
-    if(hasAggregationData) coerce('histfunc');
-
-    var binDirections = ['x', 'y'];
-    handleBinDefaults(traceIn, traceOut, coerce, binDirections);
-};
-
-},{"../../registry":234,"../histogram/bin_defaults":299}],311:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var histogram2dAttrs = require('../histogram2d/attributes');
-var contourAttrs = require('../contour/attributes');
-var colorscaleAttrs = require('../../components/colorscale/attributes');
-var colorbarAttrs = require('../../components/colorbar/attributes');
-
-var extendFlat = require('../../lib/extend').extendFlat;
-
-module.exports = extendFlat({}, {
-    x: histogram2dAttrs.x,
-    y: histogram2dAttrs.y,
-    z: histogram2dAttrs.z,
-    marker: histogram2dAttrs.marker,
-
-    histnorm: histogram2dAttrs.histnorm,
-    histfunc: histogram2dAttrs.histfunc,
-    autobinx: histogram2dAttrs.autobinx,
-    nbinsx: histogram2dAttrs.nbinsx,
-    xbins: histogram2dAttrs.xbins,
-    autobiny: histogram2dAttrs.autobiny,
-    nbinsy: histogram2dAttrs.nbinsy,
-    ybins: histogram2dAttrs.ybins,
-
-    autocontour: contourAttrs.autocontour,
-    ncontours: contourAttrs.ncontours,
-    contours: contourAttrs.contours,
-    line: contourAttrs.line
-},
-    colorscaleAttrs, {
-        zmin: extendFlat({}, colorscaleAttrs.zmin, {editType: 'docalc'}),
-        zmax: extendFlat({}, colorscaleAttrs.zmax, {editType: 'docalc'})
-    },
-    { colorbar: colorbarAttrs }
-);
-
-},{"../../components/colorbar/attributes":42,"../../components/colorscale/attributes":46,"../../lib/extend":149,"../contour/attributes":266,"../histogram2d/attributes":306}],312:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var Lib = require('../../lib');
-
-var handleSampleDefaults = require('../histogram2d/sample_defaults');
-var handleContoursDefaults = require('../contour/contours_defaults');
-var handleStyleDefaults = require('../contour/style_defaults');
-var attributes = require('./attributes');
-
-
-module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
-    function coerce(attr, dflt) {
-        return Lib.coerce(traceIn, traceOut, attributes, attr, dflt);
-    }
-
-    handleSampleDefaults(traceIn, traceOut, coerce, layout);
-    handleContoursDefaults(traceIn, traceOut, coerce);
-    handleStyleDefaults(traceIn, traceOut, coerce, layout);
-};
-
-},{"../../lib":154,"../contour/contours_defaults":270,"../contour/style_defaults":280,"../histogram2d/sample_defaults":310,"./attributes":311}],313:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var Histogram2dContour = {};
-
-Histogram2dContour.attributes = require('./attributes');
-Histogram2dContour.supplyDefaults = require('./defaults');
-Histogram2dContour.calc = require('../contour/calc');
-Histogram2dContour.plot = require('../contour/plot').plot;
-Histogram2dContour.style = require('../contour/style');
-Histogram2dContour.colorbar = require('../contour/colorbar');
-Histogram2dContour.hoverPoints = require('../contour/hover');
-
-Histogram2dContour.moduleType = 'trace';
-Histogram2dContour.name = 'histogram2dcontour';
-Histogram2dContour.basePlotModule = require('../../plots/cartesian');
-Histogram2dContour.categories = ['cartesian', '2dMap', 'contour', 'histogram'];
-Histogram2dContour.meta = {
-    
-    
-};
-
-module.exports = Histogram2dContour;
-
-},{"../../plots/cartesian":200,"../contour/calc":267,"../contour/colorbar":268,"../contour/hover":274,"../contour/plot":278,"../contour/style":279,"./attributes":311,"./defaults":312}],314:[function(require,module,exports){
+},{}],314:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.

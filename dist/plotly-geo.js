@@ -13595,6 +13595,313 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 'use strict';
 
+var annAtts = require('../annotations/attributes');
+
+module.exports = {
+    _isLinkedToArray: 'annotation',
+
+    visible: annAtts.visible,
+    x: {
+        valType: 'any',
+        
+        
+    },
+    y: {
+        valType: 'any',
+        
+        
+    },
+    z: {
+        valType: 'any',
+        
+        
+    },
+    ax: {
+        valType: 'number',
+        
+        
+    },
+    ay: {
+        valType: 'number',
+        
+        
+    },
+
+    xanchor: annAtts.xanchor,
+    xshift: annAtts.xshift,
+    yanchor: annAtts.yanchor,
+    yshift: annAtts.yshift,
+
+    text: annAtts.text,
+    textangle: annAtts.textangle,
+    font: annAtts.font,
+    width: annAtts.width,
+    height: annAtts.height,
+    opacity: annAtts.opacity,
+    align: annAtts.align,
+    valign: annAtts.valign,
+    bgcolor: annAtts.bgcolor,
+    bordercolor: annAtts.bordercolor,
+    borderpad: annAtts.borderpad,
+    borderwidth: annAtts.borderwidth,
+    showarrow: annAtts.showarrow,
+    arrowcolor: annAtts.arrowcolor,
+    arrowhead: annAtts.arrowhead,
+    arrowsize: annAtts.arrowsize,
+    arrowwidth: annAtts.arrowwidth,
+    standoff: annAtts.standoff,
+    hovertext: annAtts.hovertext,
+    hoverlabel: annAtts.hoverlabel,
+    captureevents: annAtts.captureevents
+
+    // maybes later?
+    // clicktoshow: annAtts.clicktoshow,
+    // xclick: annAtts.xclick,
+    // yclick: annAtts.yclick,
+
+    // not needed!
+    // axref: 'pixel'
+    // ayref: 'pixel'
+    // xref: 'x'
+    // yref: 'y
+    // zref: 'z'
+};
+
+},{"../annotations/attributes":26}],20:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Lib = require('../../lib');
+var Axes = require('../../plots/cartesian/axes');
+
+module.exports = function convert(scene) {
+    var fullSceneLayout = scene.fullSceneLayout;
+    var anns = fullSceneLayout.annotations;
+
+    for(var i = 0; i < anns.length; i++) {
+        mockAnnAxes(anns[i], scene);
+    }
+
+    scene.fullLayout._infolayer
+        .selectAll('.annotation-' + scene.id)
+        .remove();
+};
+
+function mockAnnAxes(ann, scene) {
+    var fullSceneLayout = scene.fullSceneLayout;
+    var domain = fullSceneLayout.domain;
+    var size = scene.fullLayout._size;
+
+    var base = {
+        // this gets fill in on render
+        pdata: null,
+
+        // to get setConvert to not execute cleanly
+        type: 'linear',
+
+        // don't try to update them on `editable: true`
+        autorange: false,
+
+        // set infinite range so that annotation draw routine
+        // does not try to remove 'outside-range' annotations,
+        // this case is handled in the render loop
+        range: [-Infinity, Infinity]
+    };
+
+    ann._xa = {};
+    Lib.extendFlat(ann._xa, base);
+    Axes.setConvert(ann._xa);
+    ann._xa._offset = size.l + domain.x[0] * size.w;
+    ann._xa.l2p = function() {
+        return 0.5 * (1 + ann.pdata[0] / ann.pdata[3]) * size.w * (domain.x[1] - domain.x[0]);
+    };
+
+    ann._ya = {};
+    Lib.extendFlat(ann._ya, base);
+    Axes.setConvert(ann._ya);
+    ann._ya._offset = size.t + (1 - domain.y[1]) * size.h;
+    ann._ya.l2p = function() {
+        return 0.5 * (1 - ann.pdata[1] / ann.pdata[3]) * size.h * (domain.y[1] - domain.y[0]);
+    };
+}
+
+},{"../../lib":152,"../../plots/cartesian/axes":189}],21:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Lib = require('../../lib');
+var Axes = require('../../plots/cartesian/axes');
+var handleArrayContainerDefaults = require('../../plots/array_container_defaults');
+var handleAnnotationCommonDefaults = require('../annotations/common_defaults');
+var attributes = require('./attributes');
+
+module.exports = function handleDefaults(sceneLayoutIn, sceneLayoutOut, opts) {
+    handleArrayContainerDefaults(sceneLayoutIn, sceneLayoutOut, {
+        name: 'annotations',
+        handleItemDefaults: handleAnnotationDefaults,
+        fullLayout: opts.fullLayout
+    });
+};
+
+function handleAnnotationDefaults(annIn, annOut, sceneLayout, opts, itemOpts) {
+    function coerce(attr, dflt) {
+        return Lib.coerce(annIn, annOut, attributes, attr, dflt);
+    }
+
+    function coercePosition(axLetter) {
+        var axName = axLetter + 'axis';
+
+        // mock in such way that getFromId grabs correct 3D axis
+        var gdMock = { _fullLayout: {} };
+        gdMock._fullLayout[axName] = sceneLayout[axName];
+
+        return Axes.coercePosition(annOut, gdMock, coerce, axLetter, axLetter, 0.5);
+    }
+
+
+    var visible = coerce('visible', !itemOpts.itemIsNotPlainObject);
+    if(!visible) return annOut;
+
+    handleAnnotationCommonDefaults(annIn, annOut, opts.fullLayout, coerce);
+
+    coercePosition('x');
+    coercePosition('y');
+    coercePosition('z');
+
+    // if you have one coordinate you should all three
+    Lib.noneOrAll(annIn, annOut, ['x', 'y', 'z']);
+
+    // hard-set here for completeness
+    annOut.xref = 'x';
+    annOut.yref = 'y';
+    annOut.zref = 'z';
+
+    coerce('xanchor');
+    coerce('yanchor');
+    coerce('xshift');
+    coerce('yshift');
+
+    if(annOut.showarrow) {
+        annOut.axref = 'pixel';
+        annOut.ayref = 'pixel';
+
+        // TODO maybe default values should be bigger than the 2D case?
+        coerce('ax', -10);
+        coerce('ay', -30);
+
+        // if you have one part of arrow length you should have both
+        Lib.noneOrAll(annIn, annOut, ['ax', 'ay']);
+    }
+
+    return annOut;
+}
+
+},{"../../lib":152,"../../plots/array_container_defaults":186,"../../plots/cartesian/axes":189,"../annotations/common_defaults":29,"./attributes":19}],22:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var drawRaw = require('../annotations/draw').drawRaw;
+var project = require('../../plots/gl3d/project');
+var axLetters = ['x', 'y', 'z'];
+
+module.exports = function draw(scene) {
+    var fullSceneLayout = scene.fullSceneLayout;
+    var dataScale = scene.dataScale;
+    var anns = fullSceneLayout.annotations;
+
+    for(var i = 0; i < anns.length; i++) {
+        var ann = anns[i];
+        var annotationIsOffscreen = false;
+
+        for(var j = 0; j < 3; j++) {
+            var axLetter = axLetters[j];
+            var pos = ann[axLetter];
+            var ax = fullSceneLayout[axLetter + 'axis'];
+            var posFraction = ax.r2fraction(pos);
+
+            if(posFraction < 0 || posFraction > 1) {
+                annotationIsOffscreen = true;
+                break;
+            }
+        }
+
+        if(annotationIsOffscreen) {
+            scene.fullLayout._infolayer
+                .select('.annotation-' + scene.id + '[data-index="' + i + '"]')
+                .remove();
+        } else {
+            ann.pdata = project(scene.glplot.cameraParams, [
+                fullSceneLayout.xaxis.r2l(ann.x) * dataScale[0],
+                fullSceneLayout.yaxis.r2l(ann.y) * dataScale[1],
+                fullSceneLayout.zaxis.r2l(ann.z) * dataScale[2]
+            ]);
+
+            drawRaw(scene.graphDiv, ann, i, scene.id, ann._xa, ann._ya);
+        }
+    }
+};
+
+},{"../../plots/gl3d/project":227,"../annotations/draw":32}],23:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+module.exports = {
+    moduleType: 'component',
+    name: 'annotations3d',
+
+    schema: {
+        layout: {
+            'scene.annotations': require('./attributes')
+        }
+    },
+
+    layoutAttributes: require('./attributes'),
+    handleDefaults: require('./defaults'),
+
+    convert: require('./convert'),
+    draw: require('./draw')
+};
+
+},{"./attributes":19,"./convert":20,"./defaults":21,"./draw":22}],24:[function(require,module,exports){
+/**
+* Copyright 2012-2017, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
 var Lib = require('../../lib');
 var Axes = require('../../plots/cartesian/axes');
 var handleAnnotationCommonDefaults = require('./common_defaults');
@@ -13680,7 +13987,7 @@ module.exports = function handleAnnotationDefaults(annIn, annOut, fullLayout, op
     return annOut;
 };
 
-},{"../../lib":152,"../../plots/cartesian/axes":189,"./attributes":21,"./common_defaults":24}],20:[function(require,module,exports){
+},{"../../lib":152,"../../plots/cartesian/axes":189,"./attributes":26,"./common_defaults":29}],25:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -13745,7 +14052,7 @@ module.exports = [
     }
 ];
 
-},{}],21:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -14025,7 +14332,7 @@ module.exports = {
     }
 };
 
-},{"../../lib/extend":145,"../../plots/cartesian/constants":194,"../../plots/font_attributes":213,"./arrow_paths":20}],22:[function(require,module,exports){
+},{"../../lib/extend":145,"../../plots/cartesian/constants":194,"../../plots/font_attributes":213,"./arrow_paths":25}],27:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -14128,7 +14435,7 @@ function annAutorange(gd) {
     });
 }
 
-},{"../../lib":152,"../../plots/cartesian/axes":189,"./draw":27}],23:[function(require,module,exports){
+},{"../../lib":152,"../../plots/cartesian/axes":189,"./draw":32}],28:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -14262,7 +14569,7 @@ function clickData2r(d, ax) {
     return ax.type === 'log' ? ax.l2r(d) : ax.d2r(d);
 }
 
-},{"../../plotly":184}],24:[function(require,module,exports){
+},{"../../plotly":184}],29:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -14330,7 +14637,7 @@ module.exports = function handleAnnotationCommonDefaults(annIn, annOut, fullLayo
     coerce('captureevents', !!hoverText);
 };
 
-},{"../../lib":152,"../color":36}],25:[function(require,module,exports){
+},{"../../lib":152,"../color":36}],30:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -14393,7 +14700,7 @@ module.exports = function convertCoords(gd, ax, newType, doExtra) {
     }
 };
 
-},{"../../lib/to_log_range":170,"fast-isnumeric":11}],26:[function(require,module,exports){
+},{"../../lib/to_log_range":170,"fast-isnumeric":11}],31:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -14418,7 +14725,7 @@ module.exports = function supplyLayoutDefaults(layoutIn, layoutOut) {
     handleArrayContainerDefaults(layoutIn, layoutOut, opts);
 };
 
-},{"../../plots/array_container_defaults":186,"./annotation_defaults":19}],27:[function(require,module,exports){
+},{"../../plots/array_container_defaults":186,"./annotation_defaults":24}],32:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -15128,7 +15435,7 @@ function drawRaw(gd, options, index, subplotId, xa, ya) {
     else annText.call(textLayout);
 }
 
-},{"../../lib":152,"../../lib/setcursor":167,"../../lib/svg_text_utils":169,"../../plotly":184,"../../plots/cartesian/axes":189,"../../plots/plots":230,"../color":36,"../dragelement":57,"../drawing":60,"../fx":77,"./draw_arrow_head":28,"d3":8}],28:[function(require,module,exports){
+},{"../../lib":152,"../../lib/setcursor":167,"../../lib/svg_text_utils":169,"../../plotly":184,"../../plots/cartesian/axes":189,"../../plots/plots":230,"../color":36,"../dragelement":57,"../drawing":60,"../fx":77,"./draw_arrow_head":33,"d3":8}],33:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -15262,7 +15569,7 @@ module.exports = function drawArrowHead(el3, style, ends, mag, standoff) {
     if(doEnd) drawhead(end, endRot);
 };
 
-},{"../color":36,"../drawing":60,"./arrow_paths":20,"d3":8,"fast-isnumeric":11}],29:[function(require,module,exports){
+},{"../color":36,"../drawing":60,"./arrow_paths":25,"d3":8,"fast-isnumeric":11}],34:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -15295,314 +15602,7 @@ module.exports = {
     convertCoords: require('./convert_coords')
 };
 
-},{"./attributes":21,"./calc_autorange":22,"./click":23,"./convert_coords":25,"./defaults":26,"./draw":27}],30:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var annAtts = require('../annotations/attributes');
-
-module.exports = {
-    _isLinkedToArray: 'annotation',
-
-    visible: annAtts.visible,
-    x: {
-        valType: 'any',
-        
-        
-    },
-    y: {
-        valType: 'any',
-        
-        
-    },
-    z: {
-        valType: 'any',
-        
-        
-    },
-    ax: {
-        valType: 'number',
-        
-        
-    },
-    ay: {
-        valType: 'number',
-        
-        
-    },
-
-    xanchor: annAtts.xanchor,
-    xshift: annAtts.xshift,
-    yanchor: annAtts.yanchor,
-    yshift: annAtts.yshift,
-
-    text: annAtts.text,
-    textangle: annAtts.textangle,
-    font: annAtts.font,
-    width: annAtts.width,
-    height: annAtts.height,
-    opacity: annAtts.opacity,
-    align: annAtts.align,
-    valign: annAtts.valign,
-    bgcolor: annAtts.bgcolor,
-    bordercolor: annAtts.bordercolor,
-    borderpad: annAtts.borderpad,
-    borderwidth: annAtts.borderwidth,
-    showarrow: annAtts.showarrow,
-    arrowcolor: annAtts.arrowcolor,
-    arrowhead: annAtts.arrowhead,
-    arrowsize: annAtts.arrowsize,
-    arrowwidth: annAtts.arrowwidth,
-    standoff: annAtts.standoff,
-    hovertext: annAtts.hovertext,
-    hoverlabel: annAtts.hoverlabel,
-    captureevents: annAtts.captureevents
-
-    // maybes later?
-    // clicktoshow: annAtts.clicktoshow,
-    // xclick: annAtts.xclick,
-    // yclick: annAtts.yclick,
-
-    // not needed!
-    // axref: 'pixel'
-    // ayref: 'pixel'
-    // xref: 'x'
-    // yref: 'y
-    // zref: 'z'
-};
-
-},{"../annotations/attributes":21}],31:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Lib = require('../../lib');
-var Axes = require('../../plots/cartesian/axes');
-
-module.exports = function convert(scene) {
-    var fullSceneLayout = scene.fullSceneLayout;
-    var anns = fullSceneLayout.annotations;
-
-    for(var i = 0; i < anns.length; i++) {
-        mockAnnAxes(anns[i], scene);
-    }
-
-    scene.fullLayout._infolayer
-        .selectAll('.annotation-' + scene.id)
-        .remove();
-};
-
-function mockAnnAxes(ann, scene) {
-    var fullSceneLayout = scene.fullSceneLayout;
-    var domain = fullSceneLayout.domain;
-    var size = scene.fullLayout._size;
-
-    var base = {
-        // this gets fill in on render
-        pdata: null,
-
-        // to get setConvert to not execute cleanly
-        type: 'linear',
-
-        // don't try to update them on `editable: true`
-        autorange: false,
-
-        // set infinite range so that annotation draw routine
-        // does not try to remove 'outside-range' annotations,
-        // this case is handled in the render loop
-        range: [-Infinity, Infinity]
-    };
-
-    ann._xa = {};
-    Lib.extendFlat(ann._xa, base);
-    Axes.setConvert(ann._xa);
-    ann._xa._offset = size.l + domain.x[0] * size.w;
-    ann._xa.l2p = function() {
-        return 0.5 * (1 + ann.pdata[0] / ann.pdata[3]) * size.w * (domain.x[1] - domain.x[0]);
-    };
-
-    ann._ya = {};
-    Lib.extendFlat(ann._ya, base);
-    Axes.setConvert(ann._ya);
-    ann._ya._offset = size.t + (1 - domain.y[1]) * size.h;
-    ann._ya.l2p = function() {
-        return 0.5 * (1 - ann.pdata[1] / ann.pdata[3]) * size.h * (domain.y[1] - domain.y[0]);
-    };
-}
-
-},{"../../lib":152,"../../plots/cartesian/axes":189}],32:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Lib = require('../../lib');
-var Axes = require('../../plots/cartesian/axes');
-var handleArrayContainerDefaults = require('../../plots/array_container_defaults');
-var handleAnnotationCommonDefaults = require('../annotations/common_defaults');
-var attributes = require('./attributes');
-
-module.exports = function handleDefaults(sceneLayoutIn, sceneLayoutOut, opts) {
-    handleArrayContainerDefaults(sceneLayoutIn, sceneLayoutOut, {
-        name: 'annotations',
-        handleItemDefaults: handleAnnotationDefaults,
-        fullLayout: opts.fullLayout
-    });
-};
-
-function handleAnnotationDefaults(annIn, annOut, sceneLayout, opts, itemOpts) {
-    function coerce(attr, dflt) {
-        return Lib.coerce(annIn, annOut, attributes, attr, dflt);
-    }
-
-    function coercePosition(axLetter) {
-        var axName = axLetter + 'axis';
-
-        // mock in such way that getFromId grabs correct 3D axis
-        var gdMock = { _fullLayout: {} };
-        gdMock._fullLayout[axName] = sceneLayout[axName];
-
-        return Axes.coercePosition(annOut, gdMock, coerce, axLetter, axLetter, 0.5);
-    }
-
-
-    var visible = coerce('visible', !itemOpts.itemIsNotPlainObject);
-    if(!visible) return annOut;
-
-    handleAnnotationCommonDefaults(annIn, annOut, opts.fullLayout, coerce);
-
-    coercePosition('x');
-    coercePosition('y');
-    coercePosition('z');
-
-    // if you have one coordinate you should all three
-    Lib.noneOrAll(annIn, annOut, ['x', 'y', 'z']);
-
-    // hard-set here for completeness
-    annOut.xref = 'x';
-    annOut.yref = 'y';
-    annOut.zref = 'z';
-
-    coerce('xanchor');
-    coerce('yanchor');
-    coerce('xshift');
-    coerce('yshift');
-
-    if(annOut.showarrow) {
-        annOut.axref = 'pixel';
-        annOut.ayref = 'pixel';
-
-        // TODO maybe default values should be bigger than the 2D case?
-        coerce('ax', -10);
-        coerce('ay', -30);
-
-        // if you have one part of arrow length you should have both
-        Lib.noneOrAll(annIn, annOut, ['ax', 'ay']);
-    }
-
-    return annOut;
-}
-
-},{"../../lib":152,"../../plots/array_container_defaults":186,"../../plots/cartesian/axes":189,"../annotations/common_defaults":24,"./attributes":30}],33:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var drawRaw = require('../annotations/draw').drawRaw;
-var project = require('../../plots/gl3d/project');
-var axLetters = ['x', 'y', 'z'];
-
-module.exports = function draw(scene) {
-    var fullSceneLayout = scene.fullSceneLayout;
-    var dataScale = scene.dataScale;
-    var anns = fullSceneLayout.annotations;
-
-    for(var i = 0; i < anns.length; i++) {
-        var ann = anns[i];
-        var annotationIsOffscreen = false;
-
-        for(var j = 0; j < 3; j++) {
-            var axLetter = axLetters[j];
-            var pos = ann[axLetter];
-            var ax = fullSceneLayout[axLetter + 'axis'];
-            var posFraction = ax.r2fraction(pos);
-
-            if(posFraction < 0 || posFraction > 1) {
-                annotationIsOffscreen = true;
-                break;
-            }
-        }
-
-        if(annotationIsOffscreen) {
-            scene.fullLayout._infolayer
-                .select('.annotation-' + scene.id + '[data-index="' + i + '"]')
-                .remove();
-        } else {
-            ann.pdata = project(scene.glplot.cameraParams, [
-                fullSceneLayout.xaxis.r2l(ann.x) * dataScale[0],
-                fullSceneLayout.yaxis.r2l(ann.y) * dataScale[1],
-                fullSceneLayout.zaxis.r2l(ann.z) * dataScale[2]
-            ]);
-
-            drawRaw(scene.graphDiv, ann, i, scene.id, ann._xa, ann._ya);
-        }
-    }
-};
-
-},{"../../plots/gl3d/project":227,"../annotations/draw":27}],34:[function(require,module,exports){
-/**
-* Copyright 2012-2017, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-module.exports = {
-    moduleType: 'component',
-    name: 'annotations3d',
-
-    schema: {
-        layout: {
-            'scene.annotations': require('./attributes')
-        }
-    },
-
-    layoutAttributes: require('./attributes'),
-    handleDefaults: require('./defaults'),
-
-    convert: require('./convert'),
-    draw: require('./draw')
-};
-
-},{"./attributes":30,"./convert":31,"./defaults":32,"./draw":33}],35:[function(require,module,exports){
+},{"./attributes":26,"./calc_autorange":27,"./click":28,"./convert_coords":30,"./defaults":31,"./draw":32}],35:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -26238,7 +26238,7 @@ module.exports = {
     }
 };
 
-},{"../../lib/extend":145,"../../traces/scatter/attributes":257,"../annotations/attributes":21,"../drawing/attributes":59}],113:[function(require,module,exports){
+},{"../../lib/extend":145,"../../traces/scatter/attributes":257,"../annotations/attributes":26,"../drawing/attributes":59}],113:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -30076,7 +30076,7 @@ exports.Queue = require('./lib/queue');
 // export d3 used in the bundle
 exports.d3 = require('d3');
 
-},{"../build/plotcss":1,"../build/ploticon":2,"./components/annotations":29,"./components/annotations3d":34,"./components/fx":77,"./components/images":85,"./components/legend":93,"./components/rangeselector":105,"./components/rangeslider":111,"./components/shapes":118,"./components/sliders":124,"./components/updatemenus":130,"./fonts/mathjax_config":138,"./lib/queue":164,"./plot_api/plot_schema":178,"./plot_api/register":179,"./plot_api/set_plot_config":180,"./plot_api/to_image":182,"./plot_api/validate":183,"./plotly":184,"./snapshot":243,"./snapshot/download":240,"./traces/scatter":267,"d3":8,"es6-promise":9}],138:[function(require,module,exports){
+},{"../build/plotcss":1,"../build/ploticon":2,"./components/annotations":34,"./components/annotations3d":23,"./components/fx":77,"./components/images":85,"./components/legend":93,"./components/rangeselector":105,"./components/rangeslider":111,"./components/shapes":118,"./components/sliders":124,"./components/updatemenus":130,"./fonts/mathjax_config":138,"./lib/queue":164,"./plot_api/plot_schema":178,"./plot_api/register":179,"./plot_api/set_plot_config":180,"./plot_api/to_image":182,"./plot_api/validate":183,"./plotly":184,"./snapshot":243,"./snapshot/download":240,"./traces/scatter":267,"d3":8,"es6-promise":9}],138:[function(require,module,exports){
 /**
 * Copyright 2012-2017, Plotly, Inc.
 * All rights reserved.
@@ -30968,6 +30968,7 @@ function yearMonthDayFormatWorld(cDate) { return cDate.formatDate('M d, yyyy'); 
  *   tr: tickround ('y', 'm', 'd', 'M', 'S', or # digits)
  *      used if no explicit fmt is provided
  *   calendar: optional string, the world calendar system to use
+ *   dtick: optional string or number, side of tick for custom formatting
  *
  * returns the date/time as a string, potentially with the leading portion
  * on a separate line (after '\n')
@@ -30975,13 +30976,40 @@ function yearMonthDayFormatWorld(cDate) { return cDate.formatDate('M d, yyyy'); 
  * the axis may choose to strip things after it when they don't change from
  * one tick to the next (as it does with automatic formatting)
  */
-exports.formatDate = function(x, fmt, tr, calendar) {
+exports.formatDate = function(x, fmt, tr, calendar, dtick) {
     var headStr,
         dateStr;
 
     calendar = isWorldCalendar(calendar) && calendar;
 
-    if(fmt) return modDateFormat(fmt, x, calendar);
+    if(fmt) {
+        if(typeof fmt === 'string') return modDateFormat(fmt, x, calendar);
+        if(typeof fmt === 'object') {
+            var unit = '';
+            if(typeof dtick === 'string') {
+                if(Number(dtick.replace('M', '')) > 6) {
+                    unit = 'year';
+                } else if(Number(dtick.replace('M', '')) >= 1) {
+                    unit = 'month';
+                }
+            } else if(dtick >= ONEDAY * 7) {
+                unit = 'week';
+            } else if(dtick >= ONEDAY) {
+                unit = 'day';
+            } else if(dtick >= ONEHOUR) {
+                unit = 'hour';
+            } else if(dtick >= ONEMIN) {
+                unit = 'minute';
+            } else if(dtick >= ONESEC) {
+                unit = 'second';
+            } else if(dtick >= 0) {
+                unit = 'millisecond';
+            }
+            if(fmt[unit]) {
+                return modDateFormat(fmt[unit], x, calendar);
+            }
+        }
+    }
 
     if(calendar) {
         try {
@@ -42158,7 +42186,7 @@ function formatDate(ax, out, hover, extraPrecision) {
         else tr = {y: 'm', m: 'd', d: 'M', M: 'S', S: 4}[tr];
     }
 
-    var dateStr = Lib.formatDate(out.x, fmt, tr, ax.calendar),
+    var dateStr = Lib.formatDate(out.x, fmt, tr, ax.calendar, ax.dtick),
         headStr;
 
     var splitIndex = dateStr.indexOf('\n');
@@ -45897,7 +45925,7 @@ module.exports = {
         
     },
     tickformat: {
-        valType: 'string',
+        valType: 'any',
         dflt: '',
         
         
