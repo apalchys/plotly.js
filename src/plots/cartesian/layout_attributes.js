@@ -448,6 +448,15 @@ module.exports = {
             '*%H~%M~%S.%2f* would display *09~15~23.46*'
         ].join(' ')
     },
+    tickformatstops: {
+        valType: 'any',
+        arrayOk: true,
+        dflt: [],
+        role: 'style',
+        description: [
+            'add possibility to customize formatting on different zoom levels'
+        ].join(' ')
+    },
     hoverformat: {
         valType: 'string',
         dflt: '',

@@ -1241,7 +1241,7 @@ function tickTextObj(ax, x, text) {
 
 function formatDate(ax, out, hover, extraPrecision) {
     var tr = ax._tickround,
-        fmt = (hover && ax.hoverformat) || ax.tickformat;
+        fmt = (hover && ax.hoverformat) || axes.getTickFormat(ax);
 
     if(extraPrecision) {
         // second or sub-second precision: extra always shows max digits.
@@ -1406,7 +1406,7 @@ function numFormat(v, ax, fmtoverride, hover) {
         tickRound = ax._tickround,
         exponentFormat = fmtoverride || ax.exponentformat || 'B',
         exponent = ax._tickexponent,
-        tickformat = ax.tickformat,
+        tickformat = axes.getTickFormat(ax),
         separatethousands = ax.separatethousands;
 
     // special case for hover: set exponent just for this value, and
@@ -1506,6 +1506,49 @@ function numFormat(v, ax, fmtoverride, hover) {
     if(isNeg) return MINUS_SIGN + v;
     return v;
 }
+
+axes.getTickFormat = function(ax) {
+    function convertToMs(dtick) {
+        return typeof dtick !== 'string' ? dtick : Number(dtick.replace('M', '') * ONEAVGMONTH);
+    }
+    function compare(dtick, range, convert) {
+        var convertFunction = convert || function(x) { return x;};
+        return (!range[0] || convertFunction(range[0]) <= convertFunction(dtick)) &&
+        (!range[1] || convertFunction(range[1]) >= convertFunction(dtick));
+    }
+    var tickstop;
+    if(ax.tickformatstops && ax.tickformatstops.length > 0) {
+        switch(ax.type) {
+            case 'date': {
+                tickstop = ax.tickformatstops.filter(function(stop) { return compare(ax.dtick, stop.range, convertToMs); })
+                    .reduce(function(acc, el) {
+                        if(!acc) {
+                            return el;
+                        } else {
+                            return convertToMs(el.range[0]) > convertToMs(acc.range[0]) ? el : acc;
+                        }
+                    }, null);
+                break;
+            }
+            case 'linear': {
+                tickstop = ax.tickformatstops.filter(function(stop) { return compare(ax.dtick, stop.range); })
+                    .reduce(function(acc, el) {
+                        if(!acc) {
+                            return el;
+                        } else {
+                            return el.range[0] > acc.range[0] ? el : acc;
+                        }
+                    }, null);
+                break;
+            }
+            case 'log': {
+                break;
+            }
+            default:
+        }
+    }
+    return tickstop ? tickstop.value : ax.tickformat;
+};
 
 axes.subplotMatch = /^x([0-9]*)y([0-9]*)$/;
 
