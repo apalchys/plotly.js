@@ -1511,37 +1511,47 @@ axes.getTickFormat = function(ax) {
     function convertToMs(dtick) {
         return typeof dtick !== 'string' ? dtick : Number(dtick.replace('M', '') * ONEAVGMONTH);
     }
-    function compare(dtick, range, convert) {
-        var convertFunction = convert || function(x) { return x;};
-        return (!range[0] || convertFunction(range[0]) <= convertFunction(dtick)) &&
-        (!range[1] || convertFunction(range[1]) >= convertFunction(dtick));
+    function isProperStop(dtick, range, convert) {
+        var convertFn = convert || function(x) { return x;};
+        var leftDtick = range[0];
+        var rightDtick = range[1];
+        return (!leftDtick || convertFn(leftDtick) <= convertFn(dtick)) &&
+               (!rightDtick || convertFn(rightDtick) >= convertFn(dtick));
     }
+    function getRangeWidth(range, convert) {
+        var convertFn = convert || function(x) { return x;};
+        var left = range[0] || 0;
+        var right = range[1] || 0;
+        return Math.abs(convertFn(right) - convertFn(left));
+    }
+
     var tickstop;
     if(ax.tickformatstops && ax.tickformatstops.length > 0) {
         switch(ax.type) {
             case 'date': {
-                tickstop = ax.tickformatstops.filter(function(stop) { return compare(ax.dtick, stop.range, convertToMs); })
-                    .reduce(function(acc, el) {
-                        if(!acc) {
-                            return el;
-                        } else {
-                            return convertToMs(el.range[0]) > convertToMs(acc.range[0]) ? el : acc;
-                        }
-                    }, null);
+                tickstop = ax.tickformatstops.reduce(function(acc, stop) {
+                    if(!isProperStop(ax.dtick, stop.dtickrange, convertToMs)) {
+                        return acc;
+                    }
+                    if(!acc) {
+                        return stop;
+                    } else {
+                        return getRangeWidth(stop.dtickrange, convertToMs) > getRangeWidth(acc.dtickrange, convertToMs) ? stop : acc;
+                    }
+                }, null);
                 break;
             }
             case 'linear': {
-                tickstop = ax.tickformatstops.filter(function(stop) { return compare(ax.dtick, stop.range); })
-                    .reduce(function(acc, el) {
-                        if(!acc) {
-                            return el;
-                        } else {
-                            return el.range[0] > acc.range[0] ? el : acc;
-                        }
-                    }, null);
-                break;
-            }
-            case 'log': {
+                tickstop = ax.tickformatstops.reduce(function(acc, stop) {
+                    if(!isProperStop(ax.dtick, stop.dtickrange)) {
+                        return acc;
+                    }
+                    if(!acc) {
+                        return stop;
+                    } else {
+                        return getRangeWidth(stop.dtickrange) > getRangeWidth(acc.dtickrange) ? stop : acc;
+                    }
+                }, null);
                 break;
             }
             default:

@@ -451,10 +451,13 @@ module.exports = {
     tickformatstops: {
         valType: 'any',
         arrayOk: true,
-        dflt: [],
         role: 'style',
         description: [
-            'add possibility to customize formatting on different zoom levels'
+            'Set rules for customizing tickformat on different zoom levels for *date* and',
+            '*linear axis types. You can specify these rules in following way',
+            '[{dtickrange: [*min*, *max*], value: *format*}]. Where *min*, *max* - dtick values',
+            'which describe some zoom level, it is possible to omit *min* or *max* value by passing',
+            '*null*. *format* - string, exactly as *tickformat*'
         ].join(' ')
     },
     hoverformat: {
