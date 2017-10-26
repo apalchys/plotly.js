@@ -126,5 +126,8 @@ module.exports = {
 
     // Set global transform to be applied to all traces with no
     // specification needed
-    globalTransforms: []
+    globalTransforms: [],
+
+    // auto scale Y axis
+    axisYAutoscale: false
 };

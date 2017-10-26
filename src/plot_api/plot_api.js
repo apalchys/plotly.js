@@ -472,6 +472,7 @@ function setPlotContext(gd, config) {
         context.showTips = false;
         context.showLink = false;
         context.displayModeBar = false;
+        context.axisYAutoscale = false;
     }
 
     // make sure hover-only devices have mode bar visible

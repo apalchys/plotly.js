@@ -21,6 +21,7 @@ var Drawing = require('../../components/drawing');
 var setCursor = require('../../lib/setcursor');
 var dragElement = require('../../components/dragelement');
 var FROM_TL = require('../../constants/alignment').FROM_TL;
+var Axes = require('../../plots/cartesian/axes');
 
 var Plots = require('../plots');
 
@@ -658,6 +659,11 @@ module.exports = function dragBox(gd, plotinfo, x, y, w, h, ns, ew) {
         // ticksAndAnnotations again - it's unnecessary and would overwrite `updates`
         updateSubplots([0, 0, pw, ph]);
 
+        // change Y axis range and overwrite 'updates'
+        if(gd._context.axisYAutoscale) {
+            autoscaleYAxis();
+        }
+
         // since we may have been redrawing some things during the drag, we may have
         // accumulated MathJax promises - wait for them before we relayout.
         Lib.syncOrAsync([
@@ -764,6 +770,62 @@ module.exports = function dragBox(gd, plotinfo, x, y, w, h, ns, ew) {
                 .call(Drawing.setTextPointsScale, xScaleFactor2, yScaleFactor2)
                 .call(Drawing.hideOutsideRangePoints, subplot);
         }
+    }
+
+    // Find new range for y axis according new x axis range
+    function autoscaleYAxis() {
+        var plotinfos = fullLayout._plots;
+        var subplots = Object.keys(plotinfos);
+        var i;
+        for(i = 0; i < subplots.length; i++) {
+            var subplot = plotinfos[subplots[i]];
+            var ya = subplot.yaxis;
+            var xa = subplot.xaxis;
+            var xRange = [updates[xa._name + '.range[0]'], updates[xa._name + '.range[1]']];
+            var fitData = [];
+            var traces = subplot.plot.selectAll('.trace');
+            traces.call(processTraces, subplot, xRange, fitData);
+
+            if(fitData.length) {
+                ya._min = [];
+                ya._max = [];
+                ya.autorange = true;
+                Axes.expand(ya, fitData, {padded: true});
+                var newRange = Axes.getAutoRange(ya);
+                updates[ya._name + '.range[0]'] = newRange[0];
+                updates[ya._name + '.range[1]'] = newRange[1];
+            }
+        }
+    }
+
+    function processTraces(traces, subplot, newRange, result) {
+        traces.each(function(d) {
+            getDataInRange(d, subplot, newRange, result);
+        });
+    }
+
+    // Find data points within the x axis range to build y range
+    function getDataInRange(data, subplot, newRange, result) {
+        var xa = subplot.xaxis;
+
+        data.forEach(function(d) {
+            isPtWithinRange(xa, d, newRange) ? result.push(d.y) : null;
+        });
+    }
+
+    function isPtWithinRange(ax, d, newRange) {
+        var data = d.x;
+        var reversed = newRange[0] > newRange[1];
+
+        if(ax.type === 'date') {
+            data = ax.l2d(data);
+        } else if(ax.type === 'log') {
+            data = ax.c2r(data);
+        }
+
+        return reversed ?
+            data >= newRange[1] && data <= newRange[0] :
+            data >= newRange[0] && data <= newRange[1];
     }
 
     return dragger;

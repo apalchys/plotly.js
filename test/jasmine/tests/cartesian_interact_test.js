@@ -513,3 +513,152 @@ describe('Event data:', function() {
         .then(done);
     });
 });
+
+describe('Y axis autoscale', function() {
+
+    var mock = require('@mocks/autoscale_y_axis.json');
+    var gd, modeBar, relayoutCallback;
+
+    beforeEach(function(done) {
+        gd = createGraphDiv();
+
+        Plotly.plot(gd, mock.data, mock.layout, mock.config).then(function() {
+
+            modeBar = gd._fullLayout._modeBar;
+            relayoutCallback = jasmine.createSpy('relayoutCallback');
+            gd.on('plotly_relayout', relayoutCallback);
+        })
+        .catch(failTest)
+        .then(done);
+    });
+
+    afterEach(destroyGraphDiv);
+
+    it('should work on pan interactions', function(done) {
+        var precision = 5;
+
+        var buttonPan = selectButton(modeBar, 'pan2d');
+
+        // Switch to pan mode
+        expect(buttonPan.isActive()).toBe(false); // initially, zoom is active
+        buttonPan.click();
+        expect(buttonPan.isActive()).toBe(true); // switched on dragmode
+
+        var originalX = [0, 199];
+        var originalY = [-2667.0325798085023, 2741.4899030146853];
+
+        var newX = [-110.55555555555554, 88.44444444444446];
+        var newY = [-1316.290086181008, 1266.6664056339114];
+
+        delay(MODEBAR_DELAY)()
+        .then(function() {
+
+            expect(relayoutCallback).toHaveBeenCalledTimes(1);
+            relayoutCallback.calls.reset();
+
+            // Drag scene along the X axis
+
+            mouseEvent('mousedown', 150, 150);
+            mouseEvent('mousemove', 450, 150);
+            mouseEvent('mouseup', 450, 150);
+
+            expect(gd.layout.xaxis.range).toBeCloseToArray(newX, precision);
+            expect(gd.layout.yaxis.range).toBeCloseToArray(newY, precision);
+
+            // Drag scene back along the X axis (not from the same starting point but same X delta)
+
+            mouseEvent('mousedown', 480, 150);
+            mouseEvent('mousemove', 180, 150);
+            mouseEvent('mouseup', 180, 150);
+
+            expect(gd.layout.xaxis.range).toBeCloseToArray(originalX, precision);
+            expect(gd.layout.yaxis.range).toBeCloseToArray(originalY, precision);
+
+            // Drag scene along the Y axis
+
+            mouseEvent('mousedown', 110, 150);
+            mouseEvent('mousemove', 110, 190);
+            mouseEvent('mouseup', 110, 190);
+
+            expect(gd.layout.xaxis.range).toBeCloseToArray(originalX, precision);
+            expect(gd.layout.yaxis.range).toBeCloseToArray(originalY, precision);
+
+            // Drag scene back along the Y axis (not from the same starting point but same Y delta)
+
+            mouseEvent('mousedown', 280, 130);
+            mouseEvent('mousemove', 280, 90);
+            mouseEvent('mouseup', 280, 90);
+
+            expect(gd.layout.xaxis.range).toBeCloseToArray(originalX, precision);
+            expect(gd.layout.yaxis.range).toBeCloseToArray(originalY, precision);
+
+            // Drag scene along both the X and Y axis
+
+            mouseEvent('mousedown', 110, 150);
+            mouseEvent('mousemove', 410, 190);
+            mouseEvent('mouseup', 410, 190);
+
+            expect(gd.layout.xaxis.range).toBeCloseToArray(newX, precision);
+            expect(gd.layout.yaxis.range).toBeCloseToArray(newY, precision);
+
+            // Drag scene back along the X and Y axis (not from the same starting point but same delta vector)
+
+            mouseEvent('mousedown', 480, 130);
+            mouseEvent('mousemove', 180, 90);
+            mouseEvent('mouseup', 180, 90);
+
+            expect(gd.layout.xaxis.range).toBeCloseToArray(originalX, precision);
+            expect(gd.layout.yaxis.range).toBeCloseToArray(originalY, precision);
+        })
+        .then(delay(MODEBAR_DELAY))
+        .then(function() {
+            // X and back; Y and back; XY and back
+            expect(relayoutCallback).toHaveBeenCalledTimes(6);
+        })
+        .catch(failTest)
+        .then(done);
+    });
+
+    it('should work on zoom interactions', function(done) {
+        var precision = 5;
+
+        delay(MODEBAR_DELAY)()
+        .then(function() {
+
+            // Zoom scene first time
+
+            mouseEvent('mousedown', 150, 150);
+            mouseEvent('mousemove', 300, 350);
+            mouseEvent('mouseup', 300, 350);
+
+            expect(gd.layout.xaxis.range).toBeCloseToArray([25.796296296296294, 81.07407407407408], precision);
+            expect(gd.layout.yaxis.range).toBeCloseToArray([-1316.290086181008, 1266.6664056339114], precision);
+
+            // Zoom scene second time
+
+            mouseEvent('mousedown', 150, 150);
+            mouseEvent('mousemove', 300, 350);
+            mouseEvent('mouseup', 300, 350);
+
+            expect(gd.layout.xaxis.range).toBeCloseToArray([32.9619341563786, 48.31687242798354], precision);
+            expect(gd.layout.yaxis.range).toBeCloseToArray([-90.89287099274422, 49.66437348847765], precision);
+
+            // Zoom scene third time
+
+            mouseEvent('mousedown', 150, 150);
+            mouseEvent('mousemove', 300, 350);
+            mouseEvent('mouseup', 300, 350);
+
+            expect(gd.layout.xaxis.range).toBeCloseToArray([34.952389117512574, 39.21764974851394], precision);
+            expect(gd.layout.yaxis.range).toBeCloseToArray([-90.89287099274422, 49.66437348847765], precision);
+
+        })
+        .then(delay(MODEBAR_DELAY))
+        .then(function() {
+            // Zoom three times
+            expect(relayoutCallback).toHaveBeenCalledTimes(3);
+        })
+        .catch(failTest)
+        .then(done);
+    });
+});
