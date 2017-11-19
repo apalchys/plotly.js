@@ -124,7 +124,8 @@ module.exports = function draw(gd) {
         .each(function() {
             d3.select(this)
                 .call(drawTexts, gd)
-                .call(setupTraceToggle, gd);
+                .call(setupTraceToggle, gd)
+                .call(setupMoveSeriesYaxisButtons, gd);
         });
 
     var firstRender = legend.enter().size() !== 0;
@@ -478,6 +479,259 @@ function setupTraceToggle(g, gd) {
     });
 }
 
+function setupMoveSeriesYaxisButtons(g, gd) {
+    if(gd._context.moveSeriesYaxisButtons && gd._fullLayout._has('cartesian')) {
+        var data = g.data()[0][0];
+        var traceXaxis = data.trace.xaxis;
+        var traceYaxis = data.trace.yaxis;
+        var side = gd._fullLayout._plots[traceXaxis + traceYaxis].yaxis.side;
+        var leftButtonText;
+        var rightButtonText;
+
+        if(Lib.isPlainObject(gd._context.moveSeriesYaxisButtons)) {
+            leftButtonText = gd._context.moveSeriesYaxisButtons.left;
+            rightButtonText = gd._context.moveSeriesYaxisButtons.right;
+        }
+
+        var leftButton = g.selectAll('.leftbutton')
+            .data([0]);
+        var rightButton = g.selectAll('.rightbutton')
+            .data([0]);
+
+        leftButton.enter().append('g')
+            .classed('leftbutton', true)
+            .classed('active', side === 'left')
+            .style('cursor', 'pointer')
+            .attr('pointer-events', 'all')
+            .call(moveSeriesBetweenYaxis, gd, 'left');
+
+        leftButton.selectAll('.buttonfill').data([0]).enter().append('g')
+            .classed('buttonfill', true)
+            .selectAll('path').data([0]).enter().append('path')
+            .attr({
+                'd': 'M 19,15 L 7,15 A 6,6 90 0, 1 7,3 L 19,3',
+                'fill': side === 'left' ? 'rgb(68, 122, 219)' : 'rgb(255, 255, 255)',
+                'stroke-width': '1.5',
+                'stroke': 'rgb(68, 122, 219)',
+            });
+
+        if(leftButtonText) {
+            leftButton.selectAll('.buttonview').data([0]).enter().append('g')
+            .classed('buttonview', true)
+            .selectAll('text').data([0]).enter().append('text')
+            .attr({
+                'text-anchor': 'middle',
+                'alignment-baseline': 'middle',
+            })
+            .call(Drawing.font, {
+                family: '"Open Sans", verdana, arial, sans-serif;',
+                size: 10,
+                color: side === 'left' ? 'rgb(255, 255, 255)' : 'rgb(68, 122, 219)',
+            })
+            .text(leftButtonText);
+        } else {
+            leftButton.selectAll('.buttonview').data([0]).enter().append('g')
+            .classed('buttonview', true)
+            .selectAll('path').data([0]).enter().append('path')
+            .attr({
+                'd': 'M 13,6 L 10,9 L 13,12',
+                'fill': 'none',
+                'stroke-width': '1.5',
+                'stroke': side === 'left' ? 'rgb(255, 255, 255)' : 'rgb(68, 122, 219)',
+            });
+        }
+
+        rightButton.enter().append('g')
+            .classed('rightbutton', true)
+            .classed('active', side === 'right')
+            .style('cursor', 'pointer')
+            .attr('pointer-events', 'all')
+            .call(moveSeriesBetweenYaxis, gd, 'right');
+
+        rightButton.selectAll('.buttonfill').data([0]).enter().append('g')
+            .classed('buttonfill', true)
+            .selectAll('path').data([0]).enter().append('path')
+            .attr({
+                'd': 'M 0,3 L 12,3 A 6,6 90 0, 1 12,15 L 0,15',
+                'fill': side === 'right' ? 'rgb(68, 122, 219)' : 'rgb(255, 255, 255)',
+                'stroke-width': '1.5',
+                'stroke': 'rgb(68, 122, 219)',
+            });
+
+        if(rightButtonText) {
+            rightButton.selectAll('.buttonview').data([0]).enter().append('g')
+                .classed('buttonview', true)
+                .selectAll('text').data([0]).enter().append('text')
+                .attr({
+                    'text-anchor': 'middle',
+                    'alignment-baseline': 'middle',
+                })
+                .call(Drawing.font, {
+                    family: '"Open Sans", verdana, arial, sans-serif;',
+                    size: 10,
+                    color: side === 'right' ? 'rgb(255, 255, 255)' : 'rgb(68, 122, 219)',
+                })
+                .text(rightButtonText);
+        } else {
+            rightButton.selectAll('.buttonview').data([0]).enter().append('g')
+            .classed('buttonview', true)
+            .selectAll('path').data([0]).enter().append('path')
+            .attr({
+                'd': 'M 6,6 L 9,9 L 6,12',
+                'fill': 'none',
+                'stroke-width': '1.5',
+                'stroke': side === 'right' ? 'rgb(255, 255, 255)' : 'rgb(68, 122, 219)',
+            });
+        }
+    }
+}
+
+function moveSeriesBetweenYaxis(button, gd, position) {
+    button.on('click', function(d) {
+        var data = d[0];
+        var currentXaxis = data.trace.xaxis;
+        var currentYaxis = data.trace.yaxis;
+        var layout = gd.layout;
+
+        var plot = gd._fullLayout._plots[currentXaxis + currentYaxis];
+        var mainPlot = plot.mainplot ? gd._fullLayout._plots[plot.mainplot] : plot;
+        var mainPlotYaxis = mainPlot.yaxis._id;
+        var mainLayout;
+
+        var currentYaxisLayoutName = plot.yaxis._name;
+        var currentLayout = layout[currentYaxisLayoutName];
+
+        var indexData = data.trace.index;
+
+        var newMainYaxis = getMainYaxis(gd, mainPlot, position);
+
+        var newYaxis;
+        var newYaxisLayoutName;
+
+        var maxIndexYaxis;
+
+        var countTracesByCurrentYaxis;
+
+        var newLayout = {};
+
+        if(newMainYaxis) {
+            newYaxis = newMainYaxis.yaxis;
+            newYaxisLayoutName = newMainYaxis.yaxisLayoutName;
+        } else {
+            maxIndexYaxis = getMaxIndexYaxis(layout);
+            newYaxis = 'y' + (maxIndexYaxis + 1);
+            newYaxisLayoutName = 'yaxis' + (maxIndexYaxis + 1);
+        }
+
+        if(currentYaxis !== newYaxis) {
+            countTracesByCurrentYaxis = getCountTracesByYaxis(gd._fullData, currentYaxis);
+
+            if(countTracesByCurrentYaxis === 1) {
+                newLayout[currentYaxisLayoutName + '.visible'] = false;
+            } else {
+                newLayout[currentYaxisLayoutName + '.autorange'] = true;
+                newLayout[currentYaxisLayoutName + '.range'] = null;
+            }
+
+            mainLayout = layout[newYaxisLayoutName];
+
+            if(mainLayout) {
+                newLayout[newYaxisLayoutName + '.visible'] = true;
+                newLayout[newYaxisLayoutName + '.autorange'] = true;
+                newLayout[newYaxisLayoutName + '.range'] = null;
+
+            } else {
+                newLayout[newYaxisLayoutName] = Lib.extendDeep({}, currentLayout);
+                newLayout[newYaxisLayoutName].side = position;
+                newLayout[newYaxisLayoutName].visible = true;
+                newLayout[newYaxisLayoutName].autorange = true;
+                newLayout[newYaxisLayoutName].range = null;
+                newLayout[newYaxisLayoutName].overlaying = mainPlotYaxis;
+                newLayout[newYaxisLayoutName].anchor = currentXaxis;
+            }
+
+            Plotly.update(gd, { yaxis: newYaxis }, newLayout, indexData);
+        }
+    });
+}
+
+function getMainYaxis(gd, mainPlot, position) {
+    var mainXaxis = mainPlot.xaxis._id;
+    var newYaxis;
+    var newYaxisLayoutName;
+    var fullLayout = gd._fullLayout;
+    var plots = fullLayout._plots;
+    var plotsKeys = Object.keys(plots);
+    var plot;
+
+    if(mainPlot.yaxis.side === position) {
+        newYaxis = mainPlot.yaxis._id;
+        newYaxisLayoutName = mainPlot.yaxis._name;
+    } else {
+        for(var i = 0; i < plotsKeys.length; i++) {
+            plot = plots[plotsKeys[i]];
+
+            if(plot.mainplot === mainPlot.id) {
+                if(
+                    plot.yaxis.side === position &&
+                    (
+                        plot.yaxis.anchor === mainXaxis ||
+                        plot.yaxis._anchorAxis.anchor === plot.yaxis._id
+                    )
+                ) {
+                    newYaxis = plot.yaxis._id;
+                    newYaxisLayoutName = plot.yaxis._name;
+                    return { yaxis: newYaxis, yaxisLayoutName: newYaxisLayoutName };
+                }
+            }
+        }
+    }
+
+    return newYaxis && newYaxisLayoutName ? {
+        yaxis: newYaxis,
+        yaxisLayoutName: newYaxisLayoutName,
+    } : null;
+}
+
+function getMaxIndexYaxis(layout) {
+    var keysLayout = Object.keys(layout);
+    var key;
+    var matchYaxis;
+    var indexYaxis;
+    var maxIndexYaxis = 0;
+
+    for(var i = 0; i < keysLayout.length; i++) {
+        key = keysLayout[i];
+        matchYaxis = key.match(/^yaxis(\d*)$/i);
+
+        if(matchYaxis) {
+            indexYaxis = +matchYaxis[1];
+
+            if(indexYaxis > maxIndexYaxis) {
+                maxIndexYaxis = indexYaxis;
+            }
+        }
+    }
+
+    return maxIndexYaxis ? maxIndexYaxis : 1;
+}
+
+function getCountTracesByYaxis(dataArray, yaxis) {
+    var count = 0;
+    var i;
+    var data;
+
+    for(i = 0; i < dataArray.length; i++) {
+        data = dataArray[i];
+
+        if(data.yaxis === yaxis) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
 function computeTextDimensions(g, gd) {
     var legendItem = g.data()[0][0];
 
@@ -513,7 +767,11 @@ function computeTextDimensions(g, gd) {
         var textY = lineHeight * (0.3 + (1 - textLines) / 2);
         // TODO: this 40 should go in a constants file (along with other
         // values related to the legend symbol size)
-        svgTextUtils.positionText(text, 40, textY);
+        if(gd._context.moveSeriesYaxisButtons && gd._fullLayout._has('cartesian')) {
+            svgTextUtils.positionText(text, (40 + constants.buttonSize * 2), textY);
+        } else {
+            svgTextUtils.positionText(text, 40, textY);
+        }
     }
 
     height = Math.max(height, 16) + 3;
@@ -625,6 +883,10 @@ function computeLegendDimensions(gd, groups, traces) {
             var legendItem = d[0],
                 traceWidth = oneRowLegend ? 40 + d[0].width : maxTraceWidth;
 
+            if(gd._context.moveSeriesYaxisButtons && gd._fullLayout._has('cartesian')) {
+                traceWidth += constants.buttonSize * 2;
+            }
+
             if((borderwidth + offsetX + traceGap + traceWidth) > (fullLayout.width - (fullLayout.margin.r + fullLayout.margin.l))) {
                 offsetX = 0;
                 rowHeight = rowHeight + maxTraceHeight;
@@ -654,16 +916,52 @@ function computeLegendDimensions(gd, groups, traces) {
     opts.width = Math.ceil(opts.width);
     opts.height = Math.ceil(opts.height);
 
+    if(gd._context.moveSeriesYaxisButtons && gd._fullLayout._has('cartesian')) {
+        opts.width += constants.buttonSize * 2;
+    }
+
     traces.each(function(d) {
         var legendItem = d[0],
             bg = d3.select(this).select('.legendtoggle');
 
-        bg.call(Drawing.setRect,
-            0,
-            -legendItem.height / 2,
-            (gd._context.edits.legendText ? 0 : opts.width) + extraWidth,
-            legendItem.height
-        );
+        if(gd._context.moveSeriesYaxisButtons && gd._fullLayout._has('cartesian')) {
+            var layers = d3.select(this).select('.layers');
+            var leftButton = d3.select(this).select('.leftbutton');
+            var rightButton = d3.select(this).select('.rightbutton');
+            var leftButtonText = leftButton.select('.buttonview text');
+            var rightButtonText = rightButton.select('.buttonview text');
+
+            bg.call(Drawing.setRect,
+                constants.buttonSize * 2,
+                -legendItem.height / 2,
+                (gd._context.edits.legendText ? 0 : opts.width) + extraWidth,
+                legendItem.height
+            );
+
+            layers.attr('transform', 'translate(' + constants.buttonSize * 2 + ',' + 0 + ')');
+
+            leftButton.attr('transform', 'translate(' + 0 + ',' + -legendItem.height / 2 + ')');
+
+            rightButton.attr('transform', 'translate(' + constants.buttonSize + ',' + -legendItem.height / 2 + ')');
+
+            if(Lib.isPlainObject(gd._context.moveSeriesYaxisButtons)) {
+                leftButtonText.call(Drawing.setPosition,
+                    constants.buttonSize / 2,
+                    constants.buttonSize / 2
+                );
+                rightButtonText.call(Drawing.setPosition,
+                    constants.buttonSize / 2,
+                    constants.buttonSize / 2
+                );
+            }
+        } else {
+            bg.call(Drawing.setRect,
+                0,
+                -legendItem.height / 2,
+                (gd._context.edits.legendText ? 0 : opts.width) + extraWidth,
+                legendItem.height
+            );
+        }
     });
 }
 

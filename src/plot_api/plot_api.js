@@ -460,6 +460,14 @@ function setPlotContext(gd, config) {
                 }
             }
         }
+        if(Lib.isPlainObject(config.moveSeriesYaxisButtons)) {
+            if(
+                typeof config.moveSeriesYaxisButtons.left !== 'string' ||
+                typeof config.moveSeriesYaxisButtons.right !== 'string'
+            ) {
+                context.moveSeriesYaxisButtons = false;
+            }
+        }
     }
 
     // staticPlot forces a bunch of others:

@@ -126,5 +126,12 @@ module.exports = {
 
     // Set global transform to be applied to all traces with no
     // specification needed
-    globalTransforms: []
+    globalTransforms: [],
+
+    // enable buttons for every `trace` that allow to move series between y-axis
+    // possible values: true, false or object: { left: string, right: string }
+    // true enables the buttons with left and right arrows drawn on them
+    // object draw buttons with text specified in the correspondent properties
+    // for example { left: 'L', right: 'R' }
+    moveSeriesYaxisButtons: false,
 };

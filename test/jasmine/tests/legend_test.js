@@ -1162,3 +1162,126 @@ describe('legend interaction', function() {
         });
     });
 });
+
+describe('Move series between yaxis', function() {
+    'use strict';
+
+    afterEach(destroyGraphDiv);
+
+    function _click(index, position) {
+        return function() {
+            var item = d3.selectAll('g.' + position + 'button')[0][index];
+            return new Promise(function(resolve) {
+                item.dispatchEvent(new MouseEvent('click'));
+                setTimeout(resolve, DBLCLICKDELAY + 20);
+            });
+        };
+    }
+
+    function assertVisible(gd, expectation) {
+        var fullLayout = gd._fullLayout;
+        var layout = gd.layout;
+        var actual = [];
+
+        var keysLayout = Object.keys(layout);
+        var key;
+        var matchYaxis;
+
+        for(var i = 0; i < keysLayout.length; i++) {
+            key = keysLayout[i];
+            matchYaxis = key.match(/^yaxis(\d*)$/i);
+
+            if(matchYaxis) {
+                actual.push(fullLayout[key].visible);
+            }
+        }
+
+        expect(actual).toEqual(expectation);
+    }
+
+    function assertYaxis(gd, expectation) {
+        var fullData = gd._fullData;
+        var actual = [];
+
+        for(var i = 0; i < fullData.length; i++) {
+            actual.push(fullData[i].yaxis);
+        }
+
+        expect(actual).toEqual(expectation);
+    }
+
+    it('should change visible empty yaxis and update trace yaxis', function(done) {
+        var gd = createGraphDiv();
+        var _mock = Lib.extendDeep({}, require('@mocks/multiple_axes_double.json'));
+        _mock.config = {
+            moveSeriesYaxisButtons: true
+        };
+
+        Plotly.plot(gd, _mock).then(function() {
+            assertVisible(gd, [true, true]); // ['yaxis', 'yaxis2']
+            assertYaxis(gd, ['y', 'y2']);
+        })
+        .then(_click(1, 'left'))
+        .then(function() {
+            assertVisible(gd, [true, false]); // ['yaxis', 'yaxis2']
+            assertYaxis(gd, ['y', 'y']);
+        })
+        .then(_click(0, 'right'))
+        .then(function() {
+            assertVisible(gd, [true, true]); // ['yaxis', 'yaxis2']
+            assertYaxis(gd, ['y2', 'y']);
+        })
+        .then(_click(1, 'right'))
+        .then(function() {
+            assertVisible(gd, [false, true]); // ['yaxis', 'yaxis2']
+            assertYaxis(gd, ['y2', 'y2']);
+        })
+        .then(_click(0, 'left'))
+        .then(function() {
+            assertVisible(gd, [true, true]); // ['yaxis', 'yaxis2']
+            assertYaxis(gd, ['y', 'y2']);
+        })
+        .catch(fail)
+        .then(done);
+    });
+
+    it('should create new yaxis', function(done) {
+        var gd = createGraphDiv();
+        var _mock = Lib.extendDeep({}, require('@mocks/basic_line.json'));
+        _mock.config = {
+            moveSeriesYaxisButtons: true
+        };
+
+        Plotly.plot(gd, _mock).then(function() {
+            assertVisible(gd, [true]);// ['yaxis']
+            assertYaxis(gd, ['y', 'y']);
+        })
+        .then(_click(0, 'right'))
+        .then(function() {
+            assertVisible(gd, [true, true]);// ['yaxis', 'yaxis2']
+            assertYaxis(gd, ['y2', 'y']);
+        })
+        .then(_click(1, 'right'))
+        .then(function() {
+            assertVisible(gd, [false, true]);// ['yaxis', 'yaxis2']
+            assertYaxis(gd, ['y2', 'y2']);
+        })
+        .then(_click(0, 'left'))
+        .then(function() {
+            assertVisible(gd, [true, true]);// ['yaxis', 'yaxis2']
+            assertYaxis(gd, ['y', 'y2']);
+        })
+        .then(_click(1, 'left'))
+        .then(function() {
+            assertVisible(gd, [true, false]);// ['yaxis', 'yaxis2']
+            assertYaxis(gd, ['y', 'y']);
+        })
+        .then(_click(0, 'right'))
+        .then(function() {
+            assertVisible(gd, [true, true]);// ['yaxis', 'yaxis2']
+            assertYaxis(gd, ['y2', 'y']);
+        })
+        .catch(fail)
+        .then(done);
+    });
+});
